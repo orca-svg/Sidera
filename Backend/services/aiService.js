@@ -30,10 +30,13 @@ async function generateResponse(prompt) {
         const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
+        console.log(`[AI Raw Text]`, text);
 
         // Safety parse
         try {
-            return JSON.parse(text);
+            // Remove markdown code blocks if present
+            const jsonText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
+            return JSON.parse(jsonText);
         } catch (e) {
             console.error("JSON Parse Error:", text);
             return {

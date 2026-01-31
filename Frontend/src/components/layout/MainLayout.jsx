@@ -20,6 +20,17 @@ export function MainLayout() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [nodes])
 
+    // Init Project on Mount
+    useEffect(() => {
+        const init = async () => {
+            if (!useStore.getState().projectId) {
+                console.log("[MainLayout] Pre-initializing project...");
+                await useStore.getState().initializeProject();
+            }
+        };
+        init();
+    }, []);
+
     return (
         <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#050510', color: 'white' }}>
 
@@ -60,9 +71,13 @@ export function MainLayout() {
                             </div>
 
                             {/* AI Answer */}
-                            <div style={{ alignSelf: 'flex-start', background: '#16213e', padding: '10px 15px', borderRadius: '15px 15px 15px 0', borderLeft: '3px solid #FFD700' }}>
+                            <div style={{ alignSelf: 'flex-start', background: '#16213e', padding: '10px 15px', borderRadius: '15px 15px 15px 0', borderLeft: '3px solid #FFD700', opacity: node.isPending ? 0.7 : 1 }}>
                                 <small style={{ color: '#FFD700', fontSize: '0.8rem' }}>Sidera</small>
-                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>{node.answer}</div>
+                                <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>
+                                    {node.isPending ? (
+                                        <span style={{ fontStyle: 'italic', color: '#888' }}>Contemplating the stars...</span>
+                                    ) : node.answer}
+                                </div>
                             </div>
 
                             {/* Keywords */}

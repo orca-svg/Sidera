@@ -5,8 +5,6 @@ const Edge = require('../models/Edge');
 const { generateResponse } = require('../services/aiService');
 
 // Helper for 3D positioning
-// V2: Place nodes in a spiral or cluster based on importance/sequence?
-// For now, keep random spread but maybe influenced by importance (higher importance = closer to center? or just bigger?)
 const calculatePosition = (basePos) => {
     const spread = 5;
     return {
@@ -18,6 +16,7 @@ const calculatePosition = (basePos) => {
 
 router.post('/', async (req, res) => {
     const { projectId, message, parentNodeId } = req.body;
+    console.log(`[Chat Request] Project: ${projectId}, Message: "${message}"`);
 
     try {
         // 1. Find parent node position (or default)
@@ -28,8 +27,9 @@ router.post('/', async (req, res) => {
         }
 
         // 2. Call AI Service to get Answer, Keywords, Importance
+        console.log(`[AI Interaction] Generating response for: "${message}"...`);
         const aiData = await generateResponse(message);
-        // aiData = { answer, keywords, importance }
+        console.log(`[AI Response]`, JSON.stringify(aiData, null, 2));
 
         // 3. Create Single Node (Question + Answer)
         const newNode = new Node({
@@ -45,8 +45,7 @@ router.post('/', async (req, res) => {
         // 4. Create Edge from Previous Node -> New Node
         let newEdge = null;
         if (parentNodeId) {
-            // Logic: If parent importance is high, maybe make a solid connection?
-            const edgeType = (aiData.importance >= 4) ? 'solid' : 'solid'; // Could distinguish later
+            const edgeType = (aiData.importance >= 4) ? 'solid' : 'solid';
 
             newEdge = new Edge({
                 projectId,
