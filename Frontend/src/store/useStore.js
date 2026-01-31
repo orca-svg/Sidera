@@ -15,7 +15,7 @@ export const useStore = create((set, get) => ({
   initializeProject: async () => {
     try {
       console.log("[useStore] initializeProject: sending request...");
-      const res = await fetch('http://127.0.0.1:5000/api/projects', {
+      const res = await fetch('http://localhost:5001/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'My Constellation' })
@@ -74,7 +74,7 @@ export const useStore = create((set, get) => ({
     // 3. Call Chat API
     try {
       console.log("[useStore] Calling Chat API...");
-      const res = await fetch('http://127.0.0.1:5000/api/chat', {
+      const res = await fetch('http://localhost:5001/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
