@@ -1,32 +1,46 @@
-:root {
-  /* Brand Colors */
-  --color-bg-deep: #050510;
+@import "tailwindcss";
+
+@theme {
+  --color-background: #050510;
   --color-primary: #7C3AED;
-  /* Violet */
   --color-secondary: #ff00cc;
-  /* Magenta */
-
-  /* Text Colors */
-  --text-main: #FFFFFF;
-  --text-muted: #94A3B8;
-  --text-accent: #38bdf8;
-  /* Sky Blue */
-
-  /* Glassmorphism */
-  --glass-bg: rgba(15, 23, 42, 0.6);
+  --color-accent: #FFD700;
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-
-  /* Chat UI */
-  --chat-bg-user: #1E293B;
-  --chat-bg-ai: transparent;
-  --input-bg: rgba(30, 41, 59, 0.8);
-
-  /* Layout */
-  --sidebar-width: 260px;
-  --max-chat-width: 800px;
+  --glass-panel: rgba(0, 0, 0, 0.6);
+  --glass-sidebar: rgba(0, 0, 0, 0.8);
+  --text-main: #ffffff;
+  --text-muted: #9ca3af;
 }
 
+@layer utilities {
+  .glass-panel {
+    @apply bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+
+  .glass-sidebar {
+    @apply bg-black/80 backdrop-blur-md border-r border-white/10;
+  }
+
+  .glass-input {
+    @apply bg-gray-800/90 backdrop-blur-sm border border-transparent focus:border-white/20 transition-all;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* AnimationUtilities */
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* Base Styles */
 html,
 body,
 #root {
@@ -35,9 +49,9 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: var(--color-bg-deep);
-  color: var(--text-main);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--color-background);
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -45,7 +59,7 @@ body,
   box-sizing: border-box;
 }
 
-/* Scrollbar Styling */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -61,19 +75,4 @@ body,
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
-}
-
-/* Utilities */
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-}
-
-.flex-center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
