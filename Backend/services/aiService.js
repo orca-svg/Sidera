@@ -12,7 +12,7 @@ const genAI = new GoogleGenerativeAI(apiKey || 'INVALID_KEY_PLACEHOLDER');
 
 const model = genAI.getGenerativeModel({
     model: "gemma-3-27b-it",
-    // generationConfig: { responseMimeType: "application/json" } // Not supported by Gemma 3 yet
+    // generationConfig: { responseMimeType: "application/json" } 
 });
 
 const embeddingModel = genAI.getGenerativeModel({
@@ -49,17 +49,17 @@ async function generateResponse(prompt, context = "") {
       ${context ? `Relevant past memories:\n${context}` : "No specific relevant memories found, rely on general knowledge."}
 
       Task:
-      1. Analyze the user's input and provide a helpful, engaging response.
-      2. Extract 1-3 short keywords (noun phrases).
+      1. Analyze the user's input and provide a helpful, engaging response in **Korean** (한국어).
+      2. Extract 1-3 short keywords (noun phrases in **Korean**).
       3. Rate importance (1=Trivial, 3=Standard, 5=Crucial/Milestone).
-      4. **Summarize** the interaction in one concise sentence (Subject + Action + Result).
+      4. **Summarize** the interaction in one concise sentence in **Korean** (Subject + Action + Result).
 
       User Input: "${prompt}"
       
       Respond STRICTLY in this JSON format:
       {
-        "answer": "Your detailed response...",
-        "summary": "User asked about X, explained Y.",
+        "answer": "Your detailed response in Korean...",
+        "summary": "User asked about X, explained Y (in Korean).",
         "keywords": ["keyword1", "keyword2"],
         "importance": 3
       }
@@ -98,10 +98,10 @@ async function generateTitle(text) {
     if (!apiKey || !text) return "New Conversation";
     try {
         const prompt = `
-        Task: Generate a concise, engaging title (3-6 words) for a conversation that begins with the following user input.
+        Task: Generate a concise, engaging title (3-6 words) in **Korean** for a conversation that begins with the following user input.
         The title should reflect the core topic.
         Input: "${text}"
-        Output: Just the title text. No quotes, no "Title:", no markdown.
+        Output: Just the title text in Korean. No quotes, no "Title:", no markdown.
         `;
 
         const result = await model.generateContent(prompt);

@@ -4,7 +4,7 @@ require('dotenv').config();
 const apiKey = process.env.GOOGLE_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
-const modelName = "gemma-3-27b-it";
+const modelName = "gemma-3-12b-it";
 
 async function testAI() {
     console.log(`Testing model: ${modelName} (Key Present: ${!!apiKey})`);
