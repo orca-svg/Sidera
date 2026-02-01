@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, Sphere, Sparkles, MeshDistortMaterial } from '@react-three/drei'
 import { useStore } from '../../store/useStore'
-import * as THREE from 'three'
+import clsx from 'clsx'
 
 export function Star({ position, node, isSelected, onClick }) {
     const meshRef = useRef()
@@ -11,35 +11,34 @@ export function Star({ position, node, isSelected, onClick }) {
     const { viewMode } = useStore()
 
     // Destructure node properties
-    const { importance, keywords, question, topicSummary } = node
+    const { importance, keywords, topicSummary } = node
 
-    // --- Logic Merge: Use Current's Numeric Importance to drive Dev's Visual Categories ---
-
-    // 1. Determine "Class" based on Importance (1-5)
-    // Alpha: 5 (Crucial)
-    // Beta: 3-4 (Standard)
-    // Satellite: 1-2 (Trivial)
+    // 1. Determine "Class" based on Importance
     const isAlpha = importance >= 5
     const isBeta = importance >= 3 && importance < 5
 
-    // 2. Size Logic (Dev's sizing)
-    let baseSize = 0.04 // Satellite
+    // 2. Size Logic
+    let baseSize = 0.04
     if (isAlpha) baseSize = 0.15
     else if (isBeta) baseSize = 0.08
 
-    // 3. Color Logic (Dev's Cyberpunk Palette adjusted for hierarchy)
+    // 3. Color Logic
     const getColor = () => {
-        if (isAlpha) return { color: '#FFD700', emissive: '#FFaa00', intensity: 4.0 } // Gold (High Intensity)
+        if (isAlpha) return { color: '#FFD700', emissive: '#FFaa00', intensity: 4.0 } // Gold
         if (isBeta) return { color: '#00FFFF', emissive: '#0088FF', intensity: 2.5 } // Cyan
-        return { color: '#ffffff', emissive: '#505050', intensity: 1.5 } // White (Dim)
+        return { color: '#ffffff', emissive: '#505050', intensity: 1.5 } // White
     }
 
     const { color, emissive, intensity } = getColor()
+    const themeColor = isAlpha ? 'text-yellow-400' : 'text-cyan-400'
+    const borderColor = isAlpha ? 'border-yellow-500/50' : 'border-cyan-500/50'
+    const shadowColor = isAlpha ? 'shadow-yellow-500/20' : 'shadow-cyan-500/20'
+    const lineColor = isAlpha ? 'bg-yellow-400' : 'bg-cyan-400'
+    const lineShadow = isAlpha ? 'shadow-[0_0_10px_#fbbf24]' : 'shadow-[0_0_10px_cyan]'
 
     useFrame((state, delta) => {
         if (meshRef.current) {
             meshRef.current.rotation.y += delta * 0.5
-            // Pulse logic
             const t = state.clock.elapsedTime
             const pulse = Math.sin(t * (isSelected ? 3 : 1)) * 0.1
             const scale = (isSelected || hovered) ? 1.5 + pulse : 1 + pulse
@@ -51,18 +50,18 @@ export function Star({ position, node, isSelected, onClick }) {
         }
     })
 
-    // Label: Show ONLY in Constellation Mode (Clean Chat Mode)
-    // Logic: If constellation, allow hover/selected or default Alpha visibility
+    // Label: Show in Constellation Mode for (Hovered / Selected / Alpha)
+    // "Alpha" nodes are landmarks, so they should always be visible in this mode.
     const showLabel = viewMode === 'constellation' && (hovered || isSelected || isAlpha);
 
     return (
         <group position={position} onClick={onClick}>
-            {/* Core Star */}
+            {/* Core Star Mesh */}
             <Sphere ref={meshRef} args={[baseSize, 32, 32]}
                 onPointerOver={(e) => { e.stopPropagation(); setHover(true); }}
                 onPointerOut={(e) => setHover(false)}
             >
-                {/* Visual Style: Use Dev's Premium Materials */}
+                {/* Material */}
                 {isAlpha ? (
                     <MeshDistortMaterial
                         color={color}
@@ -80,11 +79,49 @@ export function Star({ position, node, isSelected, onClick }) {
                         emissiveIntensity={intensity}
                         roughness={0.1}
                         metalness={0.1}
-                        transmission={0.9} // Glassy look for smaller stars
+                        transmission={0.9}
                         thickness={0.5}
                     />
                 )}
             </Sphere>
+
+            {/* HUD Pin UI (Moved outside Sphere to prevent self-occlusion) */}
+            {showLabel && (
+                <Html
+                    position={[0, baseSize, 0]} // Start at top of the sphere
+                    center // Centers the div on the coordinate
+                    distanceFactor={10}
+                    zIndexRange={[100, 0]}
+                    // occlude="blending" // Optional: smoother occlusion
+                    style={{ pointerEvents: 'none' }}
+                >
+                    {/* 
+                        Layout: Flex Column Reverse 
+                        - Card (Top)
+                        - Line (Bottom)
+                        We offset translateY to make the bottom of the line touch the anchor point.
+                        Since 'center' centers the whole block, we shift UP by 50% of height.
+                    */}
+                    <div className="flex flex-col-reverse items-center transform -translate-y-[50%] pb-2">
+
+                        {/* 1. Connection Line (Grows Upwards) */}
+                        <div className={clsx("w-px h-8 transition-all duration-300", lineColor, lineShadow)} />
+
+                        {/* 2. Info Card (Glass Panel) */}
+                        <div className={clsx(
+                            "mb-1 px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-xl transition-all duration-300",
+                            "bg-black/80 text-xs whitespace-nowrap flex items-center gap-2",
+                            borderColor, shadowColor
+                        )}>
+                            <span className={clsx("font-bold animate-pulse", themeColor)}>●</span>
+                            <span className="text-gray-100 font-mono tracking-wide">
+                                {topicSummary || (keywords && keywords[0]) || "NODE"}
+                            </span>
+                        </div>
+
+                    </div>
+                </Html>
+            )}
 
             {/* Halo for Alpha Stars */}
             {isAlpha && (
@@ -98,37 +135,9 @@ export function Star({ position, node, isSelected, onClick }) {
                 </Sphere>
             )}
 
-            {/* Particles for High Importance */}
+            {/* Particles */}
             {isAlpha && (
                 <Sparkles count={15} scale={baseSize * 8} size={2} speed={0.4} opacity={0.5} color={color} />
-            )}
-
-            {/* Label: Cyberpunk HUD Style */}
-            {showLabel && (
-                <Html distanceFactor={10} position={[0, baseSize + 0.2, 0]} style={{ pointerEvents: 'none' }}>
-                    <div className="flex flex-col items-center">
-                        <div style={{
-                            color: isAlpha ? '#FFD700' : '#00FFFF',
-                            background: 'rgba(5, 5, 10, 0.7)',
-                            padding: '4px 8px',
-                            backdropFilter: 'blur(4px)',
-                            border: `1px solid ${isAlpha ? 'rgba(255, 215, 0, 0.5)' : 'rgba(0, 255, 255, 0.3)'}`,
-                            boxShadow: `0 0 15px ${isAlpha ? 'rgba(255, 215, 0, 0.2)' : 'rgba(0, 255, 255, 0.1)'}`,
-                            borderRadius: '2px',
-                            textAlign: 'center',
-                            minWidth: 'max-content',
-                            fontFamily: 'monospace',
-                            fontSize: '0.75rem',
-                            letterSpacing: '0.05em'
-                        }}>
-                            <div style={{ fontWeight: 'bold' }}>
-                                {topicSummary || (keywords && keywords[0]) || 'NODE'}
-                            </div>
-                        </div>
-                        {/* Connecting Line */}
-                        <div style={{ width: '1px', height: '20px', background: `linear-gradient(to top, ${emissive}, transparent)` }}></div>
-                    </div>
-                </Html>
             )}
         </group>
     )
