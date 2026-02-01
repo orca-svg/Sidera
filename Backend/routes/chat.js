@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Node = require('../models/Node');
 const Edge = require('../models/Edge');
-const aiService = require('../services/aiService'); // Import entire module
+const Project = require('../models/Project'); // Added Project model
+const aiService = require('../services/aiService');
 
 // --- 1. Cosine Similarity Helper ---
 function cosineSimilarity(vecA, vecB) {
@@ -137,10 +138,19 @@ router.post('/', async (req, res) => {
             console.log(`[Link] Branching from Memory: ${bestMatchNode.summary}`);
         }
 
+        // F. Auto-Rename Project (if first message or default name)
+        let projectTitle = null;
+        if (count === 0) {
+            projectTitle = await aiService.generateTitle(message);
+            await Project.findByIdAndUpdate(projectId, { name: projectTitle });
+            console.log(`[Project] Auto-renamed to: "${projectTitle}"`);
+        }
+
         // Return Data
         res.status(201).json({
             node: savedNode,
-            edges: newEdges
+            edges: newEdges,
+            projectTitle // Return the new title if generated
         });
 
     } catch (err) {

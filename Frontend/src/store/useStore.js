@@ -44,6 +44,21 @@ export const useStore = create((set, get) => ({
 
   // 2. Create New Project (New Chat)
   createProject: async () => {
+    const { projects, activeProjectId, nodes } = get();
+
+    // Check if the latest project is already a fresh empty conversation
+    // We strictly check if it's the *active* one and has no nodes to avoid assuming state of inactive projects
+    if (projects.length > 0 && projects[0].title === 'New Conversation') {
+      if (activeProjectId === projects[0].id && nodes.length === 0) {
+        console.log("[Store] Reusing existing empty project");
+        return; // Already in a new empty chat
+      }
+      // Optional: If we want to switch to the existing empty one instead of creating ANOTHER empty one?
+      // Let's do that for better UX. Switch to it.
+      get().setActiveProject(projects[0].id);
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const res = await client.post('/projects', { name: "New Conversation" });

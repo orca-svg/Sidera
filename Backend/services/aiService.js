@@ -94,4 +94,23 @@ async function generateResponse(prompt, context = "") {
     }
 }
 
-module.exports = { generateResponse, getEmbedding };
+async function generateTitle(text) {
+    if (!apiKey || !text) return "New Conversation";
+    try {
+        const prompt = `
+        Task: Generate a concise, engaging title (3-6 words) for a conversation that begins with the following user input.
+        The title should reflect the core topic.
+        Input: "${text}"
+        Output: Just the title text. No quotes, no "Title:", no markdown.
+        `;
+
+        const result = await model.generateContent(prompt);
+        const title = result.response.text().trim().replace(/^"|"$/g, '').replace(/\*\*/g, '');
+        return title || "New Conversation";
+    } catch (error) {
+        console.error("[AI Title Error]", error);
+        return "New Conversation";
+    }
+}
+
+module.exports = { generateResponse, getEmbedding, generateTitle };

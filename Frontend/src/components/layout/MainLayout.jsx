@@ -65,6 +65,19 @@ export function MainLayout() {
         }
     }, [inputValue])
 
+    // Scroll to Active Node (from Topic Click / Star Click)
+    useEffect(() => {
+        if (activeNode) {
+            const el = document.getElementById(`node-${activeNode}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Optional highlight effect
+                el.classList.add('bg-white/5', 'duration-500', 'transition-colors');
+                setTimeout(() => el.classList.remove('bg-white/5'), 1500);
+            }
+        }
+    }, [activeNode]);
+
     const handleViewUniverse = () => {
         setViewMode('constellation')
         if (window.innerWidth < 768) setIsSidebarOpen(false)
@@ -270,7 +283,7 @@ export function MainLayout() {
                                     </div>
                                 ) : (
                                     nodes.map((node) => (
-                                        <div key={node.id} className="w-full flex flex-col gap-6 animate-fade-in">
+                                        <div key={node.id} id={`node-${node.id}`} className="w-full flex flex-col gap-6 animate-fade-in transition-colors rounded-xl p-2">
                                             <div className="flex justify-end">
                                                 <div className="max-w-[85%] md:max-w-[75%] bg-gray-800 rounded-[20px] rounded-tr-sm px-6 py-4 text-gray-100 shadow-md border border-white/5 leading-relaxed">
                                                     {node.question}
