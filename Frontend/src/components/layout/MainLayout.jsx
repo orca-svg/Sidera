@@ -10,7 +10,10 @@ import {
 import clsx from 'clsx'
 
 export function MainLayout() {
-    const { nodes, addNode, setActiveNode, activeNode, initializeProject, projectId } = useStore()
+    const {
+        nodes, addNode, setActiveNode, activeNode,
+        projects, activeProjectId, createProject, setActiveProject, initializeProject
+    } = useStore()
     const [inputValue, setInputValue] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
     const chatEndRef = useRef(null)
@@ -37,16 +40,6 @@ export function MainLayout() {
         setInputValue('')
     }
 
-    const handleNewChat = async () => {
-        if (confirm("Start a new conversation? Current stars will be cleared.")) {
-            // Reset by re-initializing. For now we just reload page or clear nodes if store supports it.
-            // Since useStore doesn't have explicit reset, we can just reload or rely on backend to give fresh state if we had a 'new project' endpoint.
-            // For now, let's just clear the input. The store clear needs a method.
-            // Assuming initializeProject fetches a new or existing one.
-            await initializeProject() // Re-fetch
-        }
-    }
-
     // Auto-scroll
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -55,12 +48,11 @@ export function MainLayout() {
     // Init Project
     useEffect(() => {
         const init = async () => {
-            if (!projectId) {
-                await initializeProject();
-            }
+            await initializeProject();
         };
         init();
-    }, [projectId, initializeProject]);
+    }, [initializeProject]); // Only initialize once on mount (or when store init changes)
+
 
     // Auto-resize textarea
     useEffect(() => {
@@ -99,12 +91,13 @@ export function MainLayout() {
                     >
                         <PanelLeftClose size={20} />
                     </button>
+                    <span className="text-gray-400 text-xs font-mono">HISTORY</span>
                 </div>
 
                 {/* New Chat Button */}
                 <div className="px-4 pb-4">
                     <button
-                        onClick={handleNewChat}
+                        onClick={createProject}
                         className="w-full h-10 flex items-center gap-3 px-4 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white rounded-full transition-all duration-200 border border-transparent hover:border-accent/30 group shadow-lg"
                     >
                         <Plus size={18} className="text-gray-400 group-hover:text-accent transition-colors" />
@@ -114,27 +107,29 @@ export function MainLayout() {
 
                 {/* History Section */}
                 <div className="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
-                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Recent
-                    </div>
                     <div className="space-y-1">
-                        {nodes.length === 0 ? (
+                        {projects.length === 0 ? (
                             <div className="px-3 py-2 text-sm text-gray-500 italic">No history yet</div>
                         ) : (
-                            nodes.map(node => (
+                            projects.map(project => (
                                 <button
-                                    key={node.id}
-                                    onClick={() => setActiveNode(node.id)}
+                                    key={project.id}
+                                    onClick={() => setActiveProject(project.id)}
                                     className={clsx(
-                                        "w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative overflow-hidden",
-                                        activeNode === node.id
+                                        "w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all group relative overflow-hidden",
+                                        activeProjectId === project.id
                                             ? "bg-accent/10 text-accent font-medium"
                                             : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
                                     )}
                                 >
-                                    <MessageSquare size={16} className={activeNode === node.id ? "text-accent" : "text-gray-600 group-hover:text-gray-400"} />
-                                    <span className="truncate flex-1 relative z-10">{node.question}</span>
-                                    {activeNode === node.id && (
+                                    <MessageSquare size={16} className={activeProjectId === project.id ? "text-accent" : "text-gray-600 group-hover:text-gray-400"} />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="truncate">{project.title}</div>
+                                        <div className="text-[10px] text-gray-600 truncate">
+                                            {new Date(project.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                    {activeProjectId === project.id && (
                                         <div className="absolute inset-y-0 left-0 w-1 bg-accent rounded-r-full" />
                                     )}
                                 </button>
