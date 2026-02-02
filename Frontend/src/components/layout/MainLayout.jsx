@@ -10,6 +10,7 @@ import {
 import clsx from 'clsx'
 import { TopicList } from './TopicList'
 import { HelpModal } from './HelpModal'
+import { SettingsModal } from './SettingsModal'
 
 export function MainLayout() {
     // Merge: Use dev's expanded state store for project management + viewMode
@@ -22,6 +23,7 @@ export function MainLayout() {
     const [inputValue, setInputValue] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
     const [isHelpOpen, setIsHelpOpen] = useState(false) // New Help State
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const chatEndRef = useRef(null)
     const inputRef = useRef(null)
 
@@ -102,6 +104,10 @@ export function MainLayout() {
             {/* Help Modal */}
             <AnimatePresence>
                 {isHelpOpen && <HelpModal onClose={() => setIsHelpOpen(false)} />}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
             </AnimatePresence>
 
             {/* LAYER 0: Background Universe */}
@@ -192,7 +198,10 @@ export function MainLayout() {
                         <HelpCircle size={18} />
                         <span>Help</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-left">
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-left"
+                    >
                         <Settings size={18} />
                         <span>Settings</span>
                     </button>

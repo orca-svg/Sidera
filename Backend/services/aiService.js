@@ -30,7 +30,7 @@ async function getEmbedding(text) {
     }
 }
 
-async function generateResponse(prompt, context = "") {
+async function generateResponse(prompt, context = "", settings = {}) {
     try {
         if (!apiKey) {
             console.error("[AI Generation Error] No API Key available.");
@@ -65,7 +65,16 @@ async function generateResponse(prompt, context = "") {
       }
     `;
 
-        const result = await model.generateContent(fullPrompt);
+        // Dynamic Configuration
+        const generationConfig = {
+            temperature: settings.temperature || 0.7,
+            maxOutputTokens: settings.maxTokens || 1000,
+        };
+
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+            generationConfig
+        });
         const response = await result.response;
         const text = response.text();
         console.log(`[AI Raw Text]`, text);
@@ -75,11 +84,22 @@ async function generateResponse(prompt, context = "") {
             const jsonText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
             return JSON.parse(jsonText);
         } catch (e) {
-            console.error("JSON Parse Error:", text);
+            console.warn("[AI Service] JSON Parse Failed (likely truncated). Attempting repair.");
+
+            // Attempt to extract the "answer" field content even if truncated
+            // Matches: "answer": "..... (until end of string or closing quote)
+            const answerMatch = text.match(/"answer"\s*:\s*"([^"]*)/s);
+            let cleanedText = answerMatch ? answerMatch[1] : text;
+
+            // Remove any trailing markdown artifacts if the match failed and we used raw text
+            if (!answerMatch) {
+                cleanedText = cleanedText.replace(/```json|```/g, '').replace(/[\{\}]/g, '').trim();
+            }
+
             return {
-                answer: text,
-                summary: "Interaction about " + prompt.substring(0, 20),
-                keywords: ["Thought"],
+                answer: cleanedText + " (Response truncated...)",
+                summary: "Interaction (Truncated)",
+                keywords: ["Truncated"],
                 importance: 2
             };
         }

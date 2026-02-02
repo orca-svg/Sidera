@@ -70,8 +70,15 @@ function AnimatedUniverse({ children }) {
 }
 
 export function Universe({ isInteractive = true }) {
-    const { nodes, edges, activeNode, setActiveNode, viewMode, setIsWarping, focusTarget } = useStore()
+    const { nodes, edges, activeNode, setActiveNode, viewMode, setIsWarping, focusTarget, settings } = useStore()
     const cameraControlsRef = useRef()
+
+    // Visual Settings Logic
+    const isHighQuality = settings?.visualDetail === 'high'
+    // Fallback defaults if settings are adjusting
+    const starCount = isHighQuality ? 5000 : 1000
+    // Bloom must be present even in low mode for Node visibility, just reduced.
+    const bloomIntensity = isHighQuality ? 2.0 : 0.8
 
     // Camera Navigation (Fly to Node)
     useEffect(() => {
@@ -124,7 +131,7 @@ export function Universe({ isInteractive = true }) {
 
             <InteractiveBackground>
                 {/* Layer 1: Persistent Background Stars (Always visible with Parallax) */}
-                <Stars radius={300} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+                <Stars radius={300} depth={50} count={starCount} factor={4} saturation={0} fade speed={1} />
 
                 {/* Layer 2: Construct/Knowledge Graph (Visible only in Constellation Mode) */}
                 <AnimatedUniverse>
@@ -169,9 +176,13 @@ export function Universe({ isInteractive = true }) {
                 smoothTime={0.8} // Smooth damping for transitions
             />
 
-            {/* Post Processing: Bloom for Cyberpunk Glow */}
+            {/* Post Processing: Bloom for Cyberpunk Glow (Conditional) */}
             <EffectComposer>
-                <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={2.0} />
+                {/* Provide children or correct props if Bloom needs to be conditional. 
+                     EffectComposer usually renders effects passed as children.
+                     If intensity is 0, Bloom is effectively off, but we can also conditionally render it.
+                  */}
+                <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={bloomIntensity} />
             </EffectComposer>
         </Canvas>
     )

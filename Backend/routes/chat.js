@@ -24,8 +24,8 @@ function cosineSimilarity(vecA, vecB) {
 // --- 2. Chat Endpoint ---
 router.post('/', async (req, res) => {
     try {
-        const { message, projectId } = req.body;
-        console.log(`[Chat Request] Message: "${message}"`);
+        const { message, projectId, settings } = req.body;
+        console.log(`[Chat Request] Message: "${message}" | Settings:`, settings);
 
         // A. Generate Embedding for User Question
         const questionEmbedding = await aiService.getEmbedding(message);
@@ -68,12 +68,15 @@ router.post('/', async (req, res) => {
 
         // C. Generate Content (with Context)
         const recentNodes = await Node.find({ projectId }).sort({ createdAt: -1 }).limit(3);
+        const actualLastNode = recentNodes.length > 0 ? recentNodes[0] : null; // Define here for context usage
+        const count = await Node.countDocuments({ projectId }); // Need count for title generation
+
         // recentNodes is [Latest, Prev, PrevPrev]. Reverse for Context String order.
         const recentContext = [...recentNodes].reverse().map(n => `User: ${n.question}\nAI: ${n.answer}`).join('\n');
 
         const finalContext = (relevantContext ? `[CORE MEMORY]\n${relevantContext}\n\n` : "") + `[RECENT CHAT]\n${recentContext}`;
 
-        const aiResponse = await aiService.generateResponse(message, finalContext);
+        const aiResponse = await aiService.generateResponse(message, finalContext, settings);
 
         // D. Create New Node
         const newNode = new Node({
@@ -115,7 +118,7 @@ router.post('/', async (req, res) => {
         const newEdges = [];
 
         // Rule 1: Always check immediate continuity
-        const actualLastNode = recentNodes.length > 0 ? recentNodes[0] : null;
+        // actualLastNode is already defined above
 
         let linked = false;
 

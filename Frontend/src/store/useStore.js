@@ -14,9 +14,14 @@ export const useStore = create((set, get) => ({
   viewMode: 'chat', // 'chat' | 'constellation'
   isLoading: false,
   isWarping: false, // Transition effect state
-  error: null,
+  settings: {
+    temperature: 0.7,
+    maxTokens: 1000,
+    visualDetail: 'high' // 'low' | 'high'
+  },
 
   // --- UI Actions ---
+  updateSettings: (newSettings) => set(state => ({ settings: { ...state.settings, ...newSettings } })),
   toggleUniverse: () => set(state => ({ isUniverseExpanded: !state.isUniverseExpanded })),
   setViewMode: (mode) => set({ viewMode: mode }),
   setIsWarping: (isWarping) => set({ isWarping }),
@@ -157,6 +162,7 @@ export const useStore = create((set, get) => ({
       const res = await client.post('/chat', {
         projectId: currentProjectId,
         message: content,
+        settings: get().settings, // Pass current settings
         parentNodeId: activeNode && !activeNode.startsWith('temp-') ? activeNode : null
       });
 

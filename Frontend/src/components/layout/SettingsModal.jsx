@@ -6,7 +6,7 @@ import { useStore } from '../../store/useStore';
 
 export function SettingsModal({ onClose }) {
   const [activeTab, setActiveTab] = useState('data'); // 'visual' | 'ai' | 'data'
-  const { nodes, projects, activeProjectId } = useStore();
+  const { nodes, projects, activeProjectId, settings, updateSettings } = useStore();
 
   const activeProjectTitle = projects.find(p => p.id === activeProjectId)?.title || "Untitled Universe";
 
@@ -156,11 +156,45 @@ export function SettingsModal({ onClose }) {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-6 flex flex-col items-center justify-center py-10 opacity-50"
+                className="space-y-8"
               >
-                <Smartphone size={48} className="text-gray-600 mb-4" />
-                <p className="text-gray-400 font-medium">Visual Controls Offline</p>
-                <p className="text-xs text-gray-600">Graphics settings will be available in the next update.</p>
+                <Section title="Hologram Quality" icon={Smartphone}>
+                  <div className="space-y-6 p-4 rounded-xl bg-white/5 border border-white/5">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <label className="text-sm font-medium text-gray-300">Detail Level</label>
+                        <span className="text-xs text-accent">{settings.visualDetail === 'high' ? 'High Fidelity' : 'Performance'}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateSettings({ visualDetail: 'low' })}
+                          className={clsx(
+                            "flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all",
+                            settings.visualDetail === 'low'
+                              ? "bg-accent text-black border-accent"
+                              : "bg-transparent text-gray-500 border-gray-700 hover:border-gray-500"
+                          )}
+                        >
+                          Performance (Low)
+                        </button>
+                        <button
+                          onClick={() => updateSettings({ visualDetail: 'high' })}
+                          className={clsx(
+                            "flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all",
+                            settings.visualDetail === 'high'
+                              ? "bg-accent text-black border-accent"
+                              : "bg-transparent text-gray-500 border-gray-700 hover:border-gray-500"
+                          )}
+                        >
+                          Fidelity (High)
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 pt-2">
+                        Adjusts particle count and bloom intensity for the star map.
+                      </p>
+                    </div>
+                  </div>
+                </Section>
               </motion.div>
             )}
 
@@ -170,11 +204,51 @@ export function SettingsModal({ onClose }) {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-6 flex flex-col items-center justify-center py-10 opacity-50"
+                className="space-y-8"
               >
-                <Cpu size={48} className="text-gray-600 mb-4" />
-                <p className="text-gray-400 font-medium">AI Core Calibrating</p>
-                <p className="text-xs text-gray-600">Model parameters are locked by the administrator.</p>
+                <Section title="Core Intelligence" icon={Cpu}>
+                  <div className="space-y-6 p-4 rounded-xl bg-white/5 border border-white/5">
+                    {/* Temperature */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-gray-300">Creativity (Temperature)</label>
+                        <span className="text-xs py-0.5 px-2 rounded bg-black/50 text-accent border border-white/10 font-mono">
+                          {settings.temperature}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0" max="1" step="0.1"
+                        value={settings.temperature}
+                        onChange={(e) => updateSettings({ temperature: parseFloat(e.target.value) })}
+                        className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-accent"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Higher values make the AI more unpredictable and poetic. Lower values make it more focused and deterministic.
+                      </p>
+                    </div>
+
+                    {/* Max Tokens */}
+                    <div className="pt-4 border-t border-white/5 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-gray-300">Response Length (Max Tokens)</label>
+                        <span className="text-xs py-0.5 px-2 rounded bg-black/50 text-accent border border-white/10 font-mono">
+                          {settings.maxTokens}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="100" max="2000" step="100"
+                        value={settings.maxTokens}
+                        onChange={(e) => updateSettings({ maxTokens: parseInt(e.target.value) })}
+                        className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-accent"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Controls the maximum length of the AI's response.
+                      </p>
+                    </div>
+                  </div>
+                </Section>
               </motion.div>
             )}
 
