@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { TopicList } from './TopicList'
+import { HelpModal } from './HelpModal'
 
 export function MainLayout() {
     // Merge: Use dev's expanded state store for project management + viewMode
@@ -20,6 +21,7 @@ export function MainLayout() {
 
     const [inputValue, setInputValue] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+    const [isHelpOpen, setIsHelpOpen] = useState(false) // New Help State
     const chatEndRef = useRef(null)
     const inputRef = useRef(null)
 
@@ -96,6 +98,11 @@ export function MainLayout() {
 
     return (
         <div className="relative w-full h-dvh overflow-hidden bg-background text-white font-sans">
+
+            {/* Help Modal */}
+            <AnimatePresence>
+                {isHelpOpen && <HelpModal onClose={() => setIsHelpOpen(false)} />}
+            </AnimatePresence>
 
             {/* LAYER 0: Background Universe */}
             <div className="absolute inset-0 z-0 pointer-events-auto">
@@ -178,7 +185,10 @@ export function MainLayout() {
 
                 {/* Bottom Section: Profile/Settings */}
                 <div className="p-3 mt-auto border-t border-white/5 bg-black/40">
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-left">
+                    <button
+                        onClick={() => setIsHelpOpen(true)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-left"
+                    >
                         <HelpCircle size={18} />
                         <span>Help</span>
                     </button>
