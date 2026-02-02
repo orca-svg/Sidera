@@ -146,6 +146,8 @@ export function Universe({ isInteractive = true }) {
             style={{ height: '100%', width: '100%', background: '#050510' }}
             gl={{ preserveDrawingBuffer: true }}
         >
+            {/* Scene Background (Matches CSS for correct Capture) */}
+            <color attach="background" args={['#050510']} />
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1} />
 

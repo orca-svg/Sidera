@@ -71,6 +71,7 @@ export function Star({ position, node, isSelected, onClick }) {
                         metalness={0.9}
                         distort={0.4}
                         speed={2}
+                        toneMapped={false}
                     />
                 ) : (
                     <meshPhysicalMaterial
@@ -81,6 +82,7 @@ export function Star({ position, node, isSelected, onClick }) {
                         metalness={0.1}
                         transmission={0.9}
                         thickness={0.5}
+                        toneMapped={false}
                     />
                 )}
             </Sphere>

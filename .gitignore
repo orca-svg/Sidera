@@ -6,3 +6,6 @@ coverage
 .vscode
 input_data
 **/env
+
+openspec
+openspec/*
