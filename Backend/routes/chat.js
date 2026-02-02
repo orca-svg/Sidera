@@ -24,7 +24,58 @@ function cosineSimilarity(vecA, vecB) {
 // --- 2. Chat Endpoint ---
 router.post('/', async (req, res) => {
     try {
-        const { message, projectId, settings } = req.body;
+        const { message, projectId, settings, isGuest, history } = req.body; // Added isGuest, history
+        console.log(`[Chat Request] ${isGuest ? '[GUEST]' : ''} Message: "${message}"`);
+
+        // --- GUEST MODE: VOLATILE (NO DB SAVE) ---
+        if (isGuest) {
+            // 1. Build Context from Client History
+            // History expected format: [{ question: "...", answer: "..." }, ...]
+            const recentContext = history
+                ? history.slice(-3).map(n => `User: ${n.question}\nAI: ${n.answer}`).join('\n')
+                : "";
+            const finalContext = `[RECENT CHAT]\n${recentContext}`;
+
+            // 2. Generate Response
+            const aiResponse = await aiService.generateResponse(message, finalContext, settings);
+
+            // 3. Return Ephemeral Node
+            // We mock the ID and positions since we don't save.
+            const lastNode = history && history.length > 0 ? history[history.length - 1] : null;
+
+            let newPosition = { x: 0, y: 0, z: 0 };
+            if (lastNode && lastNode.position) {
+                // Simple random walk for Guest
+                const distance = 5 + Math.random() * 5;
+                const theta = Math.random() * 2 * Math.PI;
+                newPosition = {
+                    x: lastNode.position.x + distance * Math.cos(theta),
+                    y: lastNode.position.y + distance * Math.sin(theta),
+                    z: lastNode.position.z + (Math.random() - 0.5) * 4
+                };
+            }
+
+            const ephemeralNode = {
+                _id: 'guest-' + Date.now(), // Fake ID
+                projectId: 'guest-session',
+                question: message,
+                answer: aiResponse.answer,
+                keywords: aiResponse.keywords,
+                importance: aiResponse.importance,
+                summary: aiResponse.summary,
+                position: newPosition,
+                createdAt: new Date().toISOString()
+            };
+
+            // Return immediately without saving
+            return res.status(200).json({
+                node: ephemeralNode,
+                edges: [], // No persistent edges for guests
+                projectTitle: history && history.length === 0 ? "Guest Exploration" : null
+            });
+        }
+
+        // --- NORMAL MODE (DB PERSISTENCE) ---
         console.log(`[Chat Request] Message: "${message}" | Settings:`, settings);
 
         // A. Generate Embedding for User Question

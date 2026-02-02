@@ -12,6 +12,8 @@ import clsx from 'clsx'
 import { TopicList } from './TopicList'
 import { HelpModal } from './HelpModal'
 import { SettingsModal } from './SettingsModal'
+import { useAuth } from '../../auth/AuthContext'
+
 
 // Optimized: Hoist static data outside component to avoid recreation on every render
 const SUGGESTION_CARDS = [
@@ -33,6 +35,9 @@ export function MainLayout() {
     const initializeProject = useStore(state => state.initializeProject)
     const viewMode = useStore(state => state.viewMode)
     const setViewMode = useStore(state => state.setViewMode)
+    const user = useStore(state => state.user) // Get synced user from store
+
+    const { logout } = useAuth()
 
     const [inputValue, setInputValue] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -206,7 +211,13 @@ export function MainLayout() {
                         Recent
                     </div>
                     <div className="space-y-1">
-                        {projects.length === 0 ? (
+                        {user?.isGuest ? (
+                            <div className="px-3 py-4 text-center">
+                                <span className="text-xs text-orange-400 bg-orange-400/10 px-2 py-1 rounded">
+                                    History not saved
+                                </span>
+                            </div>
+                        ) : projects.length === 0 ? (
                             <div className="px-3 py-2 text-sm text-gray-500 italic">No history yet</div>
                         ) : (
                             projects.map(project => (
@@ -252,14 +263,34 @@ export function MainLayout() {
                         <Settings size={18} />
                         <span>Settings</span>
                     </button>
-                    <div className="mt-2 flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-inner border border-white/10">
-                            U
-                        </div>
+
+                    <div className="mt-2 flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group">
+                        {user?.picture ? (
+                            <img src={user.picture} alt="User" className="w-8 h-8 rounded-full border border-white/20" />
+                        ) : (
+                            <div className={clsx(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-inner border border-white/10",
+                                user?.isGuest ? "bg-gradient-to-tr from-orange-500 to-red-500" : "bg-gradient-to-tr from-indigo-500 to-purple-500"
+                            )}>
+                                {user?.name?.[0] || "U"}
+                            </div>
+                        )}
+
                         <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">User</div>
-                            <div className="text-xs text-accent truncate">Pro Plan</div>
+                            <div className="text-sm font-medium text-white truncate">{user?.name || "User"}</div>
+                            <div className={clsx("text-xs truncate", user?.isGuest ? "text-orange-400" : "text-accent")}>
+                                {user?.isGuest ? "Guest Mode" : "Pro Plan"}
+                            </div>
                         </div>
+
+                        {/* Logout Button (Hidden by default, shown on hover/group) */}
+                        <button
+                            onClick={logout}
+                            title="Sign Out"
+                            className="p-1.5 rounded-md hover:bg-white/20 text-gray-400 hover:text-red-400 transition-colors"
+                        >
+                            <PanelLeftClose size={14} className="rotate-180" />
+                        </button>
                     </div>
                 </div>
             </motion.div>

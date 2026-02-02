@@ -28,8 +28,29 @@ export const useStore = create((set, get) => ({
 
   // --- Async Actions ---
 
+  // --- User State ---
+  user: null,
+  setUser: (user) => {
+    set({ user });
+    // If user changes (e.g. login/logout), re-init
+    if (user) {
+      get().initializeProject();
+      // If guest, ensure view mode is chat
+      if (user.isGuest) {
+        set({ viewMode: 'chat' });
+      }
+    } else {
+      set({ projects: [], nodes: [], activeProjectId: null });
+    }
+  },
+
+  // --- Async Actions ---
+
   // 1. Fetch Project List (Sidebar)
   fetchProjects: async () => {
+    const { user } = get();
+    if (user?.isGuest) return; // Guests have no persistent projects
+
     set({ isLoading: true, error: null });
     try {
       const res = await client.get('/projects');
@@ -51,7 +72,21 @@ export const useStore = create((set, get) => ({
 
   // 2. Create New Project (New Chat)
   createProject: async () => {
-    const { projects, activeProjectId, nodes } = get();
+    const { projects, activeProjectId, nodes, user } = get();
+
+    // Guest Mode Logic
+    if (user?.isGuest) {
+      // Guests only have one volatile session. If they want "New", we just clear nodes?
+      // Or we treat it as "reset".
+      set({
+        activeProjectId: 'guest-session',
+        nodes: [],
+        edges: [],
+        activeNode: null,
+        projects: [{ id: 'guest-session', title: 'Guest Exploration', lastUpdated: new Date() }]
+      });
+      return;
+    }
 
     // Check if the latest project is already a fresh empty conversation
     // We strictly check if it's the *active* one and has no nodes to avoid assuming state of inactive projects
@@ -93,6 +128,9 @@ export const useStore = create((set, get) => ({
 
   // 3. Set Active Project & Load History (The "History Loading" Logic)
   setActiveProject: async (projectId) => {
+    // Guest Handling
+    if (get().user?.isGuest) return;
+
     // 1. Immediate State Update (Clear current view)
     set({ activeProjectId: projectId, isLoading: true, error: null, activeNode: null, nodes: [] });
 
@@ -135,13 +173,11 @@ export const useStore = create((set, get) => ({
 
   // 4. Send Message & Instant Title Update
   addNode: async (content) => {
-    const { activeProjectId, nodes, activeNode } = get();
+    const { activeProjectId, nodes, activeNode, user } = get();
 
     // Auto-create project if missing
     if (!activeProjectId) {
       await get().createProject();
-      // Retry after creation? createProject sets activeProjectId
-      // We can continue with get().activeProjectId
     }
     const currentProjectId = get().activeProjectId;
 
@@ -158,13 +194,18 @@ export const useStore = create((set, get) => ({
     set({ nodes: [...nodes, tempNode], activeNode: tempId });
 
     try {
-      // API Call
-      const res = await client.post('/chat', {
+      // API Call Payload
+      const payload = {
         projectId: currentProjectId,
         message: content,
         settings: get().settings, // Pass current settings
-        parentNodeId: activeNode && !activeNode.startsWith('temp-') ? activeNode : null
-      });
+        parentNodeId: activeNode && !activeNode.startsWith('temp-') ? activeNode : null,
+        isGuest: user?.isGuest,
+        // For Guests: Pass History Context
+        history: user?.isGuest ? nodes : undefined
+      };
+
+      const res = await client.post('/chat', payload);
 
       const { node: savedNode, edge: savedEdge, projectTitle } = res.data;
 
@@ -231,6 +272,14 @@ export const useStore = create((set, get) => ({
 
   // Initial App Load
   initializeProject: async () => {
+    const { user } = get();
+    if (!user) return; // Wait for auth
+
+    if (user.isGuest) {
+      await get().createProject(); // Triggers guest init
+      return;
+    }
+
     await get().fetchProjects();
     const { projects } = get();
     if (projects.length === 0) {
