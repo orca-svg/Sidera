@@ -1,8 +1,9 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { CameraControls, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useStore } from '../../store/useStore'
+import { useEventListener } from '../../hooks/useEventListener'
 import { Star } from './Star'
 import { Constellation } from './Constellation'
 import { WarpField } from './WarpField'
@@ -13,16 +14,12 @@ function InteractiveBackground({ children }) {
 
     const mouseRef = useRef({ x: 0, y: 0 })
 
-    useEffect(() => {
-        const handleMouseMove = (event) => {
-            // Normalize mouse position (-1 to 1)
-            mouseRef.current.x = (event.clientX / window.innerWidth) * 2 - 1
-            mouseRef.current.y = -(event.clientY / window.innerHeight) * 2 + 1
-        }
-
-        window.addEventListener('mousemove', handleMouseMove)
-        return () => window.removeEventListener('mousemove', handleMouseMove)
-    }, [])
+    // Optimized: Use custom hook for event listener management
+    useEventListener('mousemove', (event) => {
+        // Normalize mouse position (-1 to 1)
+        mouseRef.current.x = (event.clientX / window.innerWidth) * 2 - 1
+        mouseRef.current.y = -(event.clientY / window.innerHeight) * 2 + 1
+    })
 
     useFrame((state) => {
         if (ref.current) {
@@ -70,15 +67,37 @@ function AnimatedUniverse({ children }) {
 }
 
 export function Universe({ isInteractive = true }) {
-    const { nodes, edges, activeNode, setActiveNode, viewMode, setIsWarping, focusTarget, settings } = useStore()
+    // Optimized: Use selective Zustand selectors to prevent unnecessary re-renders
+    const nodes = useStore(state => state.nodes)
+    const edges = useStore(state => state.edges)
+    const activeNode = useStore(state => state.activeNode)
+    const setActiveNode = useStore(state => state.setActiveNode)
+    const viewMode = useStore(state => state.viewMode)
+    const setIsWarping = useStore(state => state.setIsWarping)
+    const focusTarget = useStore(state => state.focusTarget)
+    const settings = useStore(state => state.settings)
     const cameraControlsRef = useRef()
 
-    // Visual Settings Logic
-    const isHighQuality = settings?.visualDetail === 'high'
-    // Fallback defaults if settings are adjusting
-    const starCount = isHighQuality ? 5000 : 1000
-    // Bloom must be present even in low mode for Node visibility, just reduced.
-    const bloomIntensity = isHighQuality ? 2.0 : 0.8
+    // Optimized: Create node index map for O(1) lookups instead of O(n²)
+    const nodeMap = useMemo(() =>
+        new Map(nodes.map(n => [n.id, n])),
+        [nodes]
+    )
+
+    // Optimized: Memoize visual settings to avoid recalculation on every render
+    const visualConfig = useMemo(() => {
+        const isHighQuality = settings?.visualDetail === 'high'
+        return {
+            starCount: isHighQuality ? 5000 : 1000,
+            bloomIntensity: isHighQuality ? 2.0 : 0.8
+        }
+    }, [settings?.visualDetail])
+
+    // Optimized: Memoize event handler to prevent recreation on every render
+    const handleNodeClick = useCallback((nodeId) => (e) => {
+        e.stopPropagation()
+        if (isInteractive) setActiveNode(nodeId)
+    }, [isInteractive, setActiveNode])
 
     // Camera Navigation (Fly to Node)
     useEffect(() => {
@@ -122,7 +141,11 @@ export function Universe({ isInteractive = true }) {
     }, [viewMode, setIsWarping])
 
     return (
-        <Canvas camera={{ position: [0, 0, 120], fov: 60 }} style={{ height: '100%', width: '100%', background: '#050510' }}>
+        <Canvas
+            camera={{ position: [0, 0, 120], fov: 60 }}
+            style={{ height: '100%', width: '100%', background: '#050510' }}
+            gl={{ preserveDrawingBuffer: true }}
+        >
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1} />
 
@@ -131,7 +154,7 @@ export function Universe({ isInteractive = true }) {
 
             <InteractiveBackground>
                 {/* Layer 1: Persistent Background Stars (Always visible with Parallax) */}
-                <Stars radius={300} depth={50} count={starCount} factor={4} saturation={0} fade speed={1} />
+                <Stars radius={300} depth={50} count={visualConfig.starCount} factor={4} saturation={0} fade speed={1} />
 
                 {/* Layer 2: Construct/Knowledge Graph (Visible only in Constellation Mode) */}
                 <AnimatedUniverse>
@@ -143,17 +166,15 @@ export function Universe({ isInteractive = true }) {
                             position={node.position}
                             node={node}
                             isSelected={activeNode === node.id}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (isInteractive) setActiveNode(node.id)
-                            }}
+                            onClick={handleNodeClick(node.id)}
                         />
                     ))}
 
                     {/* Render Edges (Constellations) */}
                     {edges.map((edge) => {
-                        const sourceNode = nodes.find(n => n.id === edge.source)
-                        const targetNode = nodes.find(n => n.id === edge.target)
+                        // Optimized: Use Map for O(1) lookup instead of Array.find O(n)
+                        const sourceNode = nodeMap.get(edge.source)
+                        const targetNode = nodeMap.get(edge.target)
                         if (!sourceNode || !targetNode) return null
 
                         return (
@@ -178,11 +199,11 @@ export function Universe({ isInteractive = true }) {
 
             {/* Post Processing: Bloom for Cyberpunk Glow (Conditional) */}
             <EffectComposer>
-                {/* Provide children or correct props if Bloom needs to be conditional. 
+                {/* Provide children or correct props if Bloom needs to be conditional.
                      EffectComposer usually renders effects passed as children.
                      If intensity is 0, Bloom is effectively off, but we can also conditionally render it.
                   */}
-                <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={bloomIntensity} />
+                <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={visualConfig.bloomIntensity} />
             </EffectComposer>
         </Canvas>
     )

@@ -1,24 +1,38 @@
 import { useState, useEffect, useRef } from 'react'
 import { Universe } from '../canvas/Universe'
 import { useStore } from '../../store/useStore'
+import { useEventListener } from '../../hooks/useEventListener'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Menu, Plus, MessageSquare, X, Settings,
     HelpCircle, User, Mic, Send, Paperclip,
-    Sparkles, PanelLeftClose, PanelLeftOpen, Telescope
+    Sparkles, PanelLeftClose, PanelLeftOpen, Telescope, Camera
 } from 'lucide-react'
 import clsx from 'clsx'
 import { TopicList } from './TopicList'
 import { HelpModal } from './HelpModal'
 import { SettingsModal } from './SettingsModal'
 
+// Optimized: Hoist static data outside component to avoid recreation on every render
+const SUGGESTION_CARDS = [
+    { t: 'Structure of a black hole', i: '⚫' },
+    { t: 'Nearest star system', i: '⭐' },
+    { t: 'Explain dark matter', i: '🌌' }
+]
+
 export function MainLayout() {
-    // Merge: Use dev's expanded state store for project management + viewMode
-    const {
-        nodes, addNode, setActiveNode, activeNode,
-        projects, activeProjectId, createProject, setActiveProject, initializeProject,
-        viewMode, setViewMode
-    } = useStore()
+    // Optimized: Use selective Zustand selectors to prevent unnecessary re-renders
+    const nodes = useStore(state => state.nodes)
+    const addNode = useStore(state => state.addNode)
+    const setActiveNode = useStore(state => state.setActiveNode)
+    const activeNode = useStore(state => state.activeNode)
+    const projects = useStore(state => state.projects)
+    const activeProjectId = useStore(state => state.activeProjectId)
+    const createProject = useStore(state => state.createProject)
+    const setActiveProject = useStore(state => state.setActiveProject)
+    const initializeProject = useStore(state => state.initializeProject)
+    const viewMode = useStore(state => state.viewMode)
+    const setViewMode = useStore(state => state.setViewMode)
 
     const [inputValue, setInputValue] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -27,7 +41,7 @@ export function MainLayout() {
     const chatEndRef = useRef(null)
     const inputRef = useRef(null)
 
-    // Mobile check
+    // Mobile check - Optimized: Use custom hook for event listener
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
@@ -36,10 +50,16 @@ export function MainLayout() {
                 setIsSidebarOpen(true)
             }
         }
-        handleResize()
-        window.addEventListener('resize', handleResize)
-        return () => window.removeEventListener('resize', handleResize)
+        handleResize() // Initial check
     }, [])
+
+    useEventListener('resize', () => {
+        if (window.innerWidth < 768) {
+            setIsSidebarOpen(false)
+        } else {
+            setIsSidebarOpen(true)
+        }
+    })
 
     const handleSubmit = (e) => {
         e.preventDefault()
@@ -53,20 +73,30 @@ export function MainLayout() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [nodes])
 
-    // Init Project
+    // Optimized: Init Project - Use ref to ensure it only runs once on mount
+    const initialized = useRef(false)
     useEffect(() => {
-        const init = async () => {
-            await initializeProject();
-        };
-        init();
+        if (!initialized.current) {
+            const init = async () => {
+                await initializeProject();
+            };
+            init();
+            initialized.current = true
+        }
     }, [initializeProject]);
 
-    // Auto-resize textarea
+    // Optimized: Auto-resize textarea with requestAnimationFrame to batch DOM updates
     useEffect(() => {
-        if (inputRef.current) {
-            inputRef.current.style.height = 'auto'
-            inputRef.current.style.height = inputRef.current.scrollHeight + 'px'
-        }
+        if (!inputRef.current) return
+
+        const rafId = requestAnimationFrame(() => {
+            if (inputRef.current) {
+                inputRef.current.style.height = 'auto'
+                inputRef.current.style.height = inputRef.current.scrollHeight + 'px'
+            }
+        })
+
+        return () => cancelAnimationFrame(rafId)
     }, [inputValue])
 
     // Scroll to Active Node (from Topic Click / Star Click) - [Local Feature]
@@ -82,20 +112,37 @@ export function MainLayout() {
         }
     }, [activeNode]);
 
-    // ESC Key Listener for connection mode - [Remote Feature]
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && viewMode === 'constellation') {
-                setViewMode('chat')
-            }
+    // ESC Key Listener for connection mode - Optimized: Use custom hook
+    useEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && viewMode === 'constellation') {
+            setViewMode('chat')
         }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [viewMode, setViewMode])
+    })
 
     const handleViewUniverse = () => {
         setViewMode('constellation')
         if (window.innerWidth < 768) setIsSidebarOpen(false)
+    }
+
+    const handleCapture = () => {
+        // Find the canvas element
+        const canvas = document.querySelector('canvas')
+        if (!canvas) return
+
+        try {
+            // Create a temporary link
+            const link = document.createElement('a')
+            const date = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
+            link.download = `Sidera_Capture_${date}.png`
+            link.href = canvas.toDataURL('image/png')
+
+            // Trigger download
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+        } catch (err) {
+            console.error("Capture failed:", err)
+        }
     }
 
     return (
@@ -282,11 +329,7 @@ export function MainLayout() {
                                     <p className="text-xl text-gray-400 font-light">How can I help you explore the universe today?</p>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-3xl mt-4">
-                                    {[
-                                        { t: 'Structure of a black hole', i: '⚫' },
-                                        { t: 'Nearest star system', i: '⭐' },
-                                        { t: 'Explain dark matter', i: '🌌' }
-                                    ].map((item, i) => (
+                                    {SUGGESTION_CARDS.map((item, i) => (
                                         <button
                                             key={i}
                                             onClick={() => setInputValue(item.t)}
@@ -412,10 +455,18 @@ export function MainLayout() {
                             isSidebarOpen ? "md:left-[280px] w-full md:w-[calc(100%-280px)]" : "left-0 w-full"
                         )}
                     >
-                        <div className="px-6 py-3 rounded-full bg-black/50 backdrop-blur-xl border border-white/10 text-white text-sm flex items-center gap-3 shadow-2xl">
+                        <div className="pointer-events-auto px-6 py-3 rounded-full bg-black/50 backdrop-blur-xl border border-white/10 text-white text-sm flex items-center gap-3 shadow-2xl">
                             <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
                             <span>Constellation Mode Active</span>
-                            <span className="text-gray-400 border-l border-white/20 pl-3 ml-1">Press <span className="font-bold text-white">ESC</span> to return</span>
+                            <span className="text-gray-400 border-l border-white/20 pl-3 ml-1 mr-2">Press <span className="font-bold text-white">ESC</span> to return</span>
+
+                            <button
+                                onClick={handleCapture}
+                                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-colors border border-white/5 ml-2"
+                                title="Capture View"
+                            >
+                                <Camera size={16} />
+                            </button>
                         </div>
                     </motion.div>
                 )}
