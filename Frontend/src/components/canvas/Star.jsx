@@ -90,7 +90,7 @@ export function Star({ position, node, isSelected, onClick }) {
                 <Html
                     position={[0, baseSize, 0]} // Start at top of the sphere
                     center // Centers the div on the coordinate
-                    distanceFactor={10}
+                    distanceFactor={15} // Adjusted to 1.5x (User request)
                     zIndexRange={[100, 0]}
                     // occlude="blending" // Optional: smoother occlusion
                     style={{ pointerEvents: 'none' }}
@@ -104,13 +104,13 @@ export function Star({ position, node, isSelected, onClick }) {
                     */}
                     <div className="flex flex-col-reverse items-center transform -translate-y-[50%] pb-2">
 
-                        {/* 1. Connection Line (Grows Upwards) */}
-                        <div className={clsx("w-px h-8 transition-all duration-300", lineColor, lineShadow)} />
+                        {/* 1. Connection Line (Grows Upwards) - Adjusted to h-10 (intermediate) */}
+                        <div className={clsx("w-px h-10 transition-all duration-300", lineColor, lineShadow)} />
 
-                        {/* 2. Info Card (Glass Panel) */}
+                        {/* 2. Info Card (Glass Panel) - Adjusted Padding */}
                         <div className={clsx(
                             "mb-1 px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-xl transition-all duration-300",
-                            "bg-black/80 text-xs whitespace-nowrap flex items-center gap-2",
+                            "bg-black/80 text-sm whitespace-nowrap flex items-center gap-2",
                             borderColor, shadowColor
                         )}>
                             <span className={clsx("font-bold animate-pulse", themeColor)}>●</span>
