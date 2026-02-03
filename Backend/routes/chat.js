@@ -407,9 +407,11 @@ router.post('/', async (req, res) => {
             const currentProject = await Project.findById(projectId);
 
             // Only overwrite if it's a default title
-            const isDefaultTitle = !currentProject.title ||
-                currentProject.title === 'New Project' ||
-                currentProject.title === '새 프로젝트';
+            const currentName = currentProject.name || currentProject.title; // Safe fallback
+            const isDefaultTitle = !currentName ||
+                currentName === 'New Project' ||
+                currentName === '새 프로젝트' ||
+                currentName === 'New Conversation'; // Match frontend default
 
             if (isDefaultTitle) {
                 // Determine best title with strict length limit (max 30 chars)
@@ -432,9 +434,9 @@ router.post('/', async (req, res) => {
                 }
 
                 if (title) {
-                    await Project.findByIdAndUpdate(projectId, { title, lastUpdated: new Date() });
+                    await Project.findByIdAndUpdate(projectId, { name: title, lastUpdated: new Date() });
                     projectTitle = title; // Capture for response
-                    console.log(`[Project] Auto-updated title to: ${title}`);
+                    console.log(`[Project] Auto-updated name to: ${title}`);
                 }
             } else {
                 console.log(`[Project] Title is user-customized ('${currentProject.title}'), skipping auto-update.`);
