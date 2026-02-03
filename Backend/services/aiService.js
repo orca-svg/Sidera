@@ -178,6 +178,7 @@ async function generateResponse(prompt, context = "", settings = {}) {
         "answer": "Response...",
         "summary": "Full summary sentence...",
         "keywords": ["kw1", "kw2"],
+        "topicSummary": "대화 주제 요약 (5단어 이내)",
         "shortTitle": "초간결제목",
         "starLabel": "별 라벨"
       }

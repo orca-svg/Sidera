@@ -99,6 +99,22 @@ Sidera-IS v2.1의 핵심 혁신은 **'첫 질문 앵커링(First Question Anchor
 | ⭐ | **하위 20%** | **Trivial:** 인사말, 농담. 시각화에서 축소됨. |
 
 이러한 로직은 Sidera가 절대적인 기준을 강요하지 않고, **"사용자가 설정한 대화의 수준(Contextual Standard)"**에 맞춰 유연하게 중요도를 평가하는 지능형 시스템임을 보여줍니다.
+
+3.4 UI 표시 요약 필드
+Sidera는 각 턴에 대해 AI가 생성하는 여러 요약 필드를 사용합니다:
+
+| 필드명 | 용도 | 최대 길이 |
+| :--- | :--- | :--- |
+| `topicSummary` | Topic Flow 목록, Star 라벨 | 5단어 |
+| `shortTitle` | 좌측 프로젝트 목록 (fallback) | 10자 |
+| `starLabel` | Star 라벨 (fallback) | 15자 |
+
+**좌측 패널 표시 우선순위:**
+1. 사용자가 편집한 `project.title` (최우선)
+2. 기본 제목인 경우: `topicSummary` → `shortTitle` → 기본 제목
+
+**Star 핀 라벨 표시 우선순위:**
+`topicSummary` → `starLabel` → `keywords[0]` → "NODE"
  
 4. Sidera 연결 로직 및 담화 그래프 아키텍처 (Sidera-Connect)
 별 등급이 각 '점(Node)'의 속성을 정의했다면, 연결 로직은 이 점들을 잇는 '선(Edge)'을 정의하여 대화의 맥락적 지형(Contextual Topology)을 구축합니다. Sidera는 단순한 시계열 연결을 넘어, 의미론적 인과관계를 시각화하는 **동적 담화 그래프(Dynamic Discourse Graph)**를 지향합니다.

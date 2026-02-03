@@ -321,6 +321,7 @@ router.post('/', async (req, res) => {
             importance: 3, // Temporary, will be updated by Sidera-IS
             importanceScore: 0,
             summary: aiResponse.summary,
+            topicSummary: aiResponse.topicSummary || aiResponse.shortTitle || (aiResponse.keywords && aiResponse.keywords[0]) || "Topic",
             shortTitle: aiResponse.shortTitle || (aiResponse.keywords && aiResponse.keywords[0]) || "",
             starLabel: aiResponse.starLabel || aiResponse.shortTitle || ""
         });
