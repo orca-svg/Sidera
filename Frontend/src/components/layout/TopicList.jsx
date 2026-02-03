@@ -5,7 +5,8 @@ import { List, ChevronRight, ChevronLeft, Target, Telescope } from 'lucide-react
 import clsx from 'clsx';
 
 export function TopicList() {
-  const { nodes, flyToNode, viewMode, setViewMode } = useStore();
+  const { nodes, flyToNode, viewMode, setViewMode, projects, activeProjectId, setActiveNode } = useStore();
+  const currentProject = projects.find(p => p.id === activeProjectId);
   const [isOpen, setIsOpen] = useState(true);
 
   // Show ALL turns in Topic Flow (not filtered by importance)
@@ -67,10 +68,16 @@ export function TopicList() {
               {tocNodes.length === 0 ? (
                 <div className="text-sm text-gray-500 italic px-2">Waiting for key topics...</div>
               ) : (
-                tocNodes.map((node) => (
+                tocNodes.map((node, index) => (
                   <button
                     key={node.id}
-                    onClick={() => flyToNode(node.id)}
+                    onClick={() => {
+                      if (viewMode === 'chat') {
+                        setActiveNode(node.id); // Triggers scroll in MainLayout
+                      } else {
+                        flyToNode(node.id); // Triggers camera flight & mode switch
+                      }
+                    }}
                     className="relative w-full text-left group pl-6"
                   >
                     {/* Dot on Line */}
@@ -80,12 +87,12 @@ export function TopicList() {
                     )} />
 
                     <div className={clsx(
-                      "transition-all duration-200",
-                      (node.importance === 'Alpha' || (nodes.indexOf(node) === 0 && !node.importance))
+                      "transition-all duration-200 truncate pr-2",
+                      (node.importance === 'Alpha' || (index === 0 && !node.importance))
                         ? "text-white font-medium text-sm"
                         : "text-gray-400 text-xs hover:text-gray-200"
                     )}>
-                      {node.shortTitle || node.topicSummary || (node.keywords && node.keywords[0]) || "New"}
+                      {node.topicSummary || node.shortTitle || (node.keywords && node.keywords[0]) || "New"}
                     </div>
                   </button>
                 ))

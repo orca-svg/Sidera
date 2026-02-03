@@ -178,8 +178,8 @@ async function generateResponse(prompt, context = "", settings = {}) {
         "answer": "Response...",
         "summary": "Full summary sentence...",
         "keywords": ["kw1", "kw2"],
-        "topicSummary": "대화 주제 요약 (5단어 이내)",
-        "shortTitle": "초간결제목",
+        "topicSummary": "핵심 주제 (명사형, 5단어 이내, 예: '블랙홀의 구조', '제육볶음 레시피')",
+        "shortTitle": "제목(10자)",
         "starLabel": "별 라벨"
       }
     `;
@@ -198,20 +198,39 @@ async function generateResponse(prompt, context = "", settings = {}) {
 
         let parsed;
         try {
-            parsed = JSON.parse(text.replace(/```json\n|\n```|```/g, ''));
+            // Robust check for JSON block
+            const jsonBlock = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/\{[\s\S]*\}/);
+            const rawJson = jsonBlock ? jsonBlock[1] || jsonBlock[0] : text;
+            parsed = JSON.parse(rawJson);
         } catch (e) {
-            // Simple repair attempt
-            const answerMatch = text.match(/"answer"\s*:\s*"([^"]*)/s);
+            console.error("JSON Parsing Failed, using fallback. Raw text:", text);
             parsed = {
-                answer: answerMatch ? answerMatch[1] : text.replace(/[\{\}]/g, '').substring(0, 200),
+                answer: text.replace(/```json[\s\S]*```/g, '').substring(0, 500),
                 summary: "Interaction",
-                keywords: []
+                topicSummary: "Topic",
+                shortTitle: "New Chat",
+                keywords: [],
+                starLabel: "Star"
             };
         }
 
+        // --- STRICT SANITIZATION ---
+        // Force valid types and lengths
+        if (typeof parsed.topicSummary !== 'string') parsed.topicSummary = "Topic";
+        if (parsed.topicSummary.length > 40) parsed.topicSummary = parsed.topicSummary.substring(0, 40);
+
+        if (typeof parsed.shortTitle !== 'string') parsed.shortTitle = "Chat";
+        if (parsed.shortTitle.length > 20) parsed.shortTitle = parsed.shortTitle.substring(0, 20);
+
+        if (typeof parsed.starLabel !== 'string') parsed.starLabel = "Star";
+        if (parsed.starLabel.length > 20) parsed.starLabel = parsed.starLabel.substring(0, 20);
+
+        if (!Array.isArray(parsed.keywords)) parsed.keywords = [];
+        parsed.keywords = parsed.keywords.slice(0, 5).map(k => String(k).substring(0, 15));
+
         // --- SIDERA-IS LOGIC APPLICATION ---
         // Calculate raw score (0-1)
-        const rawScore = calculateImportanceMetrics(parsed.answer + " " + prompt, "assistant");
+        const rawScore = calculateImportanceMetrics((parsed.answer || "") + " " + prompt, "assistant");
 
         // Note: The caller (chat.js) must call calculateStarRating with history
         // Here we just return the RAW score and a provisional rating (absolute)

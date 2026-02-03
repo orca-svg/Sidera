@@ -117,6 +117,7 @@ router.get('/context/:nodeId', async (req, res) => {
 
 // --- 2. Chat Endpoint ---
 router.post('/', async (req, res) => {
+    let projectTitle = null;
     try {
         const { message, projectId, settings, isGuest, history } = req.body;
         console.log(`[Chat Request] ${isGuest ? '[GUEST]' : ''} Message: "${message}"`);
@@ -313,6 +314,12 @@ router.post('/', async (req, res) => {
         const aiResponse = await aiService.generateResponse(message, finalContext, settings);
 
         // D. Create New Node Instance (Initial)
+        // STRICT SANITIZATION for topicSummary to prevent layout breaks
+        let cleanTopicSummary = aiResponse.topicSummary;
+        if (!cleanTopicSummary || cleanTopicSummary.length > 30) cleanTopicSummary = aiResponse.shortTitle;
+        if (!cleanTopicSummary || cleanTopicSummary.length > 30) cleanTopicSummary = (aiResponse.keywords && aiResponse.keywords[0]) || "Topic";
+        if (cleanTopicSummary && cleanTopicSummary.length > 30) cleanTopicSummary = cleanTopicSummary.substring(0, 30) + "..";
+
         const newNode = new Node({
             projectId,
             question: message,
@@ -321,7 +328,7 @@ router.post('/', async (req, res) => {
             importance: 3, // Temporary, will be updated by Sidera-IS
             importanceScore: 0,
             summary: aiResponse.summary,
-            topicSummary: aiResponse.topicSummary || aiResponse.shortTitle || (aiResponse.keywords && aiResponse.keywords[0]) || "Topic",
+            topicSummary: cleanTopicSummary,
             shortTitle: aiResponse.shortTitle || (aiResponse.keywords && aiResponse.keywords[0]) || "",
             starLabel: aiResponse.starLabel || aiResponse.shortTitle || ""
         });
@@ -392,6 +399,47 @@ router.post('/', async (req, res) => {
         newNode.position = newPosition;
 
         const savedNode = await newNode.save();
+
+        // Auto-update project title from first conversation's topicSummary
+        if (!rootNode) {
+            // This is the first node - update project title
+            const Project = require('../models/Project');
+            const currentProject = await Project.findById(projectId);
+
+            // Only overwrite if it's a default title
+            const isDefaultTitle = !currentProject.title ||
+                currentProject.title === 'New Project' ||
+                currentProject.title === '새 프로젝트';
+
+            if (isDefaultTitle) {
+                // Determine best title with strict length limit (max 30 chars)
+                // Match DEV branch: Prioritize "Title" (shortTitle) over "Topic Summary"
+                let title = aiResponse.shortTitle;
+
+                // If shortTitle is missing, try topicSummary
+                if (!title || title.length > 30) {
+                    title = aiResponse.topicSummary;
+                }
+
+                // If still too long or missing, try keywords or fallback to question
+                if (!title || title.length > 30) {
+                    title = (aiResponse.keywords && aiResponse.keywords[0]) || newNode.question?.substring(0, 20);
+                }
+
+                // Final safety truncation
+                if (title && title.length > 30) {
+                    title = title.substring(0, 30) + "...";
+                }
+
+                if (title) {
+                    await Project.findByIdAndUpdate(projectId, { title, lastUpdated: new Date() });
+                    projectTitle = title; // Capture for response
+                    console.log(`[Project] Auto-updated title to: ${title}`);
+                }
+            } else {
+                console.log(`[Project] Title is user-customized ('${currentProject.title}'), skipping auto-update.`);
+            }
+        }
 
         // E. Sidera-Connect: Advanced Edge Logic (ReplyScore vs TopicScore)
         const newEdges = [];
@@ -488,13 +536,8 @@ router.post('/', async (req, res) => {
             }
         }
 
-        // F. Auto-Rename Project (if first message or default name)
-        let projectTitle = null;
-        if (count === 0) {
-            projectTitle = await aiService.generateTitle(message);
-            await Project.findByIdAndUpdate(projectId, { name: projectTitle });
-            console.log(`[Project] Auto-renamed to: "${projectTitle}"`);
-        }
+
+
 
         // Return Data
         res.status(201).json({
