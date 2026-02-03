@@ -312,27 +312,60 @@ router.post('/', async (req, res) => {
 
         const aiResponse = await aiService.generateResponse(message, finalContext, settings);
 
-        // D. Create New Node
-        // 1. Fetch Distribution for Sidera-IS (Dynamic Percentiles)
-        const projectNodes = await Node.find({ projectId }).select('importanceScore');
-        const scores = projectNodes.map(n => n.importanceScore || 0);
-
-        // 2. Finalize Importance (Star Rating 1-5)
-        const finalStarRating = aiService.calculateStarRating(aiResponse.importanceScore, scores);
-
+        // D. Create New Node Instance (Initial)
         const newNode = new Node({
             projectId,
             question: message,
             answer: aiResponse.answer,
             keywords: aiResponse.keywords,
-            importance: finalStarRating,
-            importanceScore: aiResponse.importanceScore, // Save raw score for future stats
+            importance: 3, // Temporary, will be updated by Sidera-IS
+            importanceScore: 0,
             summary: aiResponse.summary
         });
 
         // Generate Embeddings for the new node
         newNode.summaryEmbedding = await aiService.getEmbedding(newNode.summary);
         newNode.fullEmbedding = await aiService.getEmbedding(newNode.question + " " + newNode.answer);
+
+        // --- SIDERA-IS v2.1: Weighted Anchor Logic ---
+        let finalImportanceScore = aiResponse.importanceScore; // Default to provisional
+
+        // 1. Fetch Root Node (First Node)
+        const rootNode = await Node.findOne({ projectId }).sort({ createdAt: 1 });
+        let rootScore = null;
+
+        // 2. Logic for Raw Score (Heuristics ONLY)
+        if (!rootNode && count === 0) {
+            // CASE A: FIRST NODE (The Anchor)
+            const isProperQuestion = message.length > 5 && (/\?|까\?|나요\?|왜|무엇|어떻게/i.test(message));
+
+            if (isProperQuestion) {
+                finalImportanceScore = 1.0; // Max Score
+                rootScore = 1.0; // Self-reference for first node
+                console.log("[Sidera-IS] First Node Anchor: Boosted to Max Importance");
+            }
+        } else {
+            // CASE B: SUBSEQUENT NODES (Standard Heuristics)
+            // Note: We reverted RootSim from Metrics, so just call standard calculation
+            const text = (newNode.answer || "") + " " + (newNode.question || "");
+            finalImportanceScore = aiService.calculateImportanceMetrics(text, "assistant");
+
+            if (rootNode) {
+                rootScore = rootNode.importanceScore;
+            }
+        }
+
+        // 3. Finalize Star Rating (Dynamic Percentiles with Weighted Anchor)
+        const projectNodes = await Node.find({ projectId }).select('importanceScore');
+        const scores = projectNodes.map(n => n.importanceScore || 0);
+        scores.push(finalImportanceScore);
+
+        // Pass 'rootScore' to adjust percentiles
+        const finalStarRating = aiService.calculateStarRating(finalImportanceScore, scores, rootScore);
+
+        newNode.importance = finalStarRating;
+        newNode.importanceScore = finalImportanceScore;
+        // ----------------------------------------------
 
         // Position Logic: Similarity-based (Sidera Constellation)
         let newPosition = { x: 0, y: 0, z: 0 };

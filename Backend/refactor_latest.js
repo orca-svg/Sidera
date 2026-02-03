@@ -41,23 +41,44 @@ async function run() {
     const nodes = await Node.find({ projectId }).sort({ createdAt: 1 });
     console.log(`Processing ${nodes.length} nodes...`);
 
-    // 3. Sidera-IS: Recalculate Node Importance Retroactively
-    console.log("--- Updating Node Importance (Sidera-IS) ---");
+    // 3. Sidera-IS v2: Recalculate Node Importance Retroactively
+    console.log("--- Updating Node Importance (Sidera-IS v2) ---");
     const nodeScores = [];
+    const rootNode = nodes.length > 0 ? nodes[0] : null; // Assume sorted by createdAt logic above
 
     // Pass 1: Calculate Raw Scores
-    for (const node of nodes) {
-      // approximate role as assistant for consistency
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
       const text = (node.answer || "") + " " + (node.question || "");
-      const rawScore = calculateImportanceMetrics(text, 'assistant');
+
+      let rawScore = 0;
+
+      if (i === 0) {
+        // Root Anchor Logic
+        const isProperQuestion = node.question && node.question.length > 5 && (/\?|까\?|나요\?|왜|무엇|어떻게/i.test(node.question));
+        if (isProperQuestion) {
+          rawScore = 1.0;
+          console.log(`  [Root Anchor] Node ${i} boosted to 1.0`);
+        } else {
+          rawScore = calculateImportanceMetrics(text, 'assistant');
+        }
+      } else {
+        // Subsequent Node Logic (Standard Heuristics)
+        rawScore = calculateImportanceMetrics(text, 'assistant');
+      }
+
       node.importanceScore = rawScore; // Save raw
       nodeScores.push(rawScore);
     }
 
+    // Determine Root Score for Percentile Shift
+    const rootScore = (nodes.length > 0 && nodes[0].importanceScore) ? nodes[0].importanceScore : null;
+
     // Pass 2: Calculate Stars based on Distribution & Save
     for (const node of nodes) {
       const oldImport = node.importance;
-      const newImport = calculateStarRating(node.importanceScore, nodeScores);
+      // Pass rootScore to adjust percentiles
+      const newImport = calculateStarRating(node.importanceScore, nodeScores, rootScore);
       node.importance = newImport;
       await node.save();
       if (oldImport !== newImport) {

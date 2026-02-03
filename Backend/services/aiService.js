@@ -18,7 +18,7 @@ const embeddingModel = genAI.getGenerativeModel({
 const SideraConfig = {
     IS: { // Importance Scoring
         weights: { info: 0.5, struct: 0.3, func: 0.2 },
-        percentiles: { p5: 0.90, p4: 0.80, p3: 0.50, p2: 0.20 } // Top 10% = 5, Top 20% = 4, etc.
+        percentiles: { p5: 0.90, p4: 0.80, p3: 0.50, p2: 0.20 }
     },
     Connect: { // Edge Generation
         explicit: {
@@ -49,7 +49,7 @@ function calculateImportanceMetrics(text, role) {
     // (B) Func Score: Speech Acts
     const funcPatterns = {
         decision: /(결정|확정|합의|결론|Action|제안|동의)/i,
-        question: /\?|까\?|나요\?/,
+        question: /\?|까\?|나요\?|왜|무엇|어떻게/,
         request: /(부탁|요청|해주세요)/
     };
     let funcScore = 0.3; // Base
@@ -59,12 +59,10 @@ function calculateImportanceMetrics(text, role) {
     funcScore = Math.min(funcScore, 1);
 
     // (C) Struct Score: Centrality / Reference
-    // For real-time new nodes, we approximate by "Reference Density" (Are we quoting or linking?)
-    // In batch refactor, this can be PageRank.
     const refCount = (text.match(/@|#|이전|아까/g) || []).length;
     const structScore = Math.min(0.2 + (refCount * 0.2), 1);
 
-    // Weighted Sum
+    // Weighted Sum (Original 3-component)
     const finalScore = (infoScore * SideraConfig.IS.weights.info) +
         (structScore * SideraConfig.IS.weights.struct) +
         (funcScore * SideraConfig.IS.weights.func);
@@ -72,19 +70,36 @@ function calculateImportanceMetrics(text, role) {
     return parseFloat(finalScore.toFixed(3));
 }
 
-function calculateStarRating(score, scoreHistory = []) {
-    // Dynamic Percentile Mapping
-    if (scoreHistory.length < 10) {
+function calculateStarRating(score, scoreHistory = [], rootScore = null) {
+    // 0. Prepare Distribution
+    // Concept: "Root Anchoring". The Root Score acts as a magnet for the distribution.
+    // We inject the Root Score multiple times (e.g. 5x) into history to shift the percentiles.
+    const effectiveHistory = [...scoreHistory];
+
+    if (rootScore !== null) {
+        // Add Weight: 5 phantom nodes of Root Score
+        for (let i = 0; i < 5; i++) effectiveHistory.push(rootScore);
+    }
+
+    // 1. Dynamic Percentile Mapping
+    if (effectiveHistory.length < 10) {
         // Fallback for cold start: absolute thresholds
-        if (score >= 0.8) return 5;
-        if (score >= 0.6) return 4;
-        if (score >= 0.4) return 3;
-        if (score >= 0.2) return 2;
-        return 1;
+        // But if Root Score is provided, we can use it to shift the absolute baseline too?
+        // Simpler: Just rely on absolute until we have data, OR accept that phantom nodes help.
+        // With 5 phantom nodes + current, we actually have decent "data" immediately!
+        if (effectiveHistory.length > 5) {
+            // Proceed to Percentile Logic below
+        } else {
+            if (score >= 0.8) return 5;
+            if (score >= 0.6) return 4;
+            if (score >= 0.4) return 3;
+            if (score >= 0.2) return 2;
+            return 1;
+        }
     }
 
     // Sort logic for percentiles (Higher is better)
-    const sorted = [...scoreHistory].sort((a, b) => a - b);
+    const sorted = effectiveHistory.sort((a, b) => a - b);
     const getPercentileVal = (p) => sorted[Math.floor(sorted.length * p)];
 
     // Calculate Cutoffs
