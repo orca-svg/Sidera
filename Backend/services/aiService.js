@@ -264,19 +264,49 @@ async function generateTitle(text) {
 }
 
 /**
+ * Generate a placeholder SVG-based image when Imagen fails
+ */
+function generatePlaceholderImage(constellationName) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+        <defs>
+            <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+                <stop offset="0%" stop-color="#1a1a3e"/>
+                <stop offset="100%" stop-color="#050510"/>
+            </radialGradient>
+        </defs>
+        <rect width="512" height="512" fill="url(#bg)"/>
+        <circle cx="256" cy="256" r="4" fill="#FFD700" opacity="0.9"/>
+        <circle cx="180" cy="200" r="3" fill="#00FFFF" opacity="0.7"/>
+        <circle cx="320" cy="180" r="2.5" fill="#88AAFF" opacity="0.7"/>
+        <circle cx="200" cy="320" r="2.5" fill="#FFFFFF" opacity="0.6"/>
+        <circle cx="340" cy="300" r="3" fill="#88AAFF" opacity="0.6"/>
+        <circle cx="150" cy="280" r="2" fill="#FFF" opacity="0.4"/>
+        <circle cx="380" cy="220" r="2" fill="#8AF" opacity="0.5"/>
+        <line x1="256" y1="256" x2="180" y2="200" stroke="#445566" stroke-width="0.5" opacity="0.3"/>
+        <line x1="256" y1="256" x2="320" y2="180" stroke="#445566" stroke-width="0.5" opacity="0.3"/>
+        <line x1="256" y1="256" x2="200" y2="320" stroke="#445566" stroke-width="0.5" opacity="0.3"/>
+        <line x1="256" y1="256" x2="340" y2="300" stroke="#445566" stroke-width="0.5" opacity="0.3"/>
+    </svg>`;
+    const base64 = Buffer.from(svg).toString('base64');
+    console.log('[Imagen] Generated placeholder image for:', constellationName);
+    return `data:image/svg+xml;base64,${base64}`;
+}
+
+/**
  * Generate constellation background image using Imagen 3.0
  * @param {string} constellationName - Name of the constellation
  * @returns {Promise<string|null>} - Base64 data URI or null on failure
  */
 async function generateConstellationImage(constellationName) {
     if (!apiKey) {
-        console.warn("[Imagen] No API key available");
-        return null;
+        console.warn("[Imagen] No API key available, using placeholder");
+        return generatePlaceholderImage(constellationName);
     }
 
     const prompt = `A breathtaking cosmic nebula scene representing "${constellationName}", dark deep space, vibrant nebula in purple blue gold, connected bright stars forming a constellation pattern, ethereal glow, dreamy cinematic, no text no watermarks no human figures`;
 
     try {
+        console.log('[Imagen] Generating image for:', constellationName);
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
             {
@@ -295,22 +325,23 @@ async function generateConstellationImage(constellationName) {
 
         if (!response.ok) {
             console.error("[Imagen] API error:", response.status, await response.text());
-            return null;
+            return generatePlaceholderImage(constellationName);
         }
 
         const data = await response.json();
         const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
 
         if (!base64Image) {
-            console.warn("[Imagen] No image in response");
-            return null;
+            console.warn("[Imagen] No image in response, using placeholder");
+            return generatePlaceholderImage(constellationName);
         }
 
+        console.log('[Imagen] Successfully generated image');
         // Return as data URI
         return `data:image/png;base64,${base64Image}`;
     } catch (err) {
         console.error("[Imagen] Generation failed:", err.message);
-        return null;
+        return generatePlaceholderImage(constellationName);
     }
 }
 

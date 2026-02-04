@@ -20,7 +20,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get completed constellation images (for background display)
+// Get completed constellation data (for background display)
+// Returns nodes/edges for rendering actual constellation structures
 // MUST be before /:id routes to avoid routing conflict
 router.get('/completed-images', async (req, res) => {
     try {
@@ -31,12 +32,33 @@ router.get('/completed-images', async (req, res) => {
             status: 'completed'
         }).select('constellationName constellationImageUrl completedAt');
 
-        res.json(completed.map(p => ({
-            projectId: p._id,
-            constellationName: p.constellationName,
-            imageUrl: p.constellationImageUrl,
-            completedAt: p.completedAt
-        })));
+        // Fetch nodes and edges for each completed project
+        const results = await Promise.all(completed.map(async (p) => {
+            const [nodes, edges] = await Promise.all([
+                Node.find({ projectId: p._id }).select('position importance').lean(),
+                Edge.find({ projectId: p._id }).select('source target type').lean()
+            ]);
+
+            return {
+                projectId: p._id,
+                constellationName: p.constellationName,
+                imageUrl: p.constellationImageUrl,
+                completedAt: p.completedAt,
+                nodes: nodes.map(n => ({
+                    id: n._id,
+                    position: n.position,
+                    importance: n.importance
+                })),
+                edges: edges.map(e => ({
+                    source: e.source,
+                    target: e.target,
+                    type: e.type
+                }))
+            };
+        }));
+
+        console.log('[Projects] Returning', results.length, 'completed constellations for background');
+        res.json(results);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

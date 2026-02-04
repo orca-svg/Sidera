@@ -782,77 +782,74 @@ export function MainLayout() {
                         {/* Hides scrolling text BEHIND the input box, but keeps Left/Right sides transparent for stars */}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/90 to-transparent pointer-events-none h-48 -bottom-8 z-[-1]"></div>
 
-                        {/* Locked State Overlay */}
-                        {isLocked && (
-                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-center pb-4 z-50 pointer-events-none">
-                                <div className="px-5 py-3 rounded-xl bg-black/50 backdrop-blur-xl border border-amber-500/20">
-                                    <p className="text-sm text-amber-300 flex items-center gap-2">
-                                        <span>✦</span>
-                                        <span>이 별자리는 완성되었습니다</span>
-                                    </p>
-                                </div>
+                        {/* Locked State: Show completed widget instead of form */}
+                        {isLocked ? (
+                            <div className="glass-input relative flex items-center justify-center gap-3 p-4 rounded-[28px] bg-gray-900/80 border border-amber-500/20 shadow-2xl backdrop-blur-xl">
+                                <span className="text-amber-400 text-lg">✦</span>
+                                <p className="text-amber-300 text-sm">이 별자리는 완성되었습니다</p>
                             </div>
+                        ) : (
+                            <>
+                                {/* Complete Button (above form) */}
+                                {!isGuest && nodes.length > 0 && (
+                                    <div className="flex justify-center mb-2">
+                                        <button
+                                            onClick={() => setIsEndModalOpen(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] text-gray-500 hover:text-amber-300 border border-transparent hover:border-amber-500/30 rounded-full hover:bg-amber-500/10 transition-all"
+                                        >
+                                            <span>✦</span>
+                                            <span>이 별자리를 완성하기</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleSubmit} className="relative group">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-purple-500/5 to-accent/5 rounded-[28px] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-700"></div>
+
+                                    <div className="glass-input relative flex items-end gap-3 p-3 rounded-[28px] bg-gray-900/80 border border-white/10 shadow-2xl backdrop-blur-xl">
+                                        <button type="button" className="p-3 text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-700 rounded-full transition-colors self-end mb-0.5">
+                                            <Plus size={20} />
+                                        </button>
+
+                                        <textarea
+                                            ref={inputRef}
+                                            value={inputValue}
+                                            onChange={(e) => setInputValue(e.target.value)}
+                                            placeholder="Message Sidera..."
+                                            rows={1}
+                                            className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 text-lg resize-none min-h-[48px] max-h-[200px] py-3 px-2 hide-scrollbar"
+                                            onCompositionStart={() => isComposing.current = true}
+                                            onCompositionEnd={() => isComposing.current = false}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    if (isComposing.current) return; // Prevent duplicate submit
+                                                    e.preventDefault();
+                                                    handleSubmit(e);
+                                                }
+                                            }}
+                                        />
+
+                                        <div className="flex items-center gap-2 self-end mb-0.5">
+                                            <button type="button" className="p-3 text-gray-400 hover:text-white transition-colors hover:bg-white/5 rounded-full">
+                                                <Mic size={20} />
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className={clsx(
+                                                    "p-3 rounded-full transition-all duration-300 shadow-lg",
+                                                    inputValue.trim()
+                                                        ? "bg-white text-black hover:scale-105 hover:bg-accent hover:text-black"
+                                                        : "bg-gray-800 text-gray-600 cursor-not-allowed"
+                                                )}
+                                                disabled={!inputValue.trim()}
+                                            >
+                                                <Send size={18} className={inputValue.trim() ? "fill-current" : ""} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </>
                         )}
-
-                        {/* Complete Button (above form) */}
-                        {!isLocked && !isGuest && nodes.length > 0 && (
-                            <div className="flex justify-center mb-2">
-                                <button
-                                    onClick={() => setIsEndModalOpen(true)}
-                                    className="flex items-center gap-1.5 px-3 py-1 text-[11px] text-gray-500 hover:text-amber-300 border border-transparent hover:border-amber-500/30 rounded-full hover:bg-amber-500/10 transition-all"
-                                >
-                                    <span>✦</span>
-                                    <span>이 별자리를 완성하기</span>
-                                </button>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className={clsx("relative group", isLocked && "opacity-50 pointer-events-none")}>
-                            <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-purple-500/5 to-accent/5 rounded-[28px] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-700"></div>
-
-                            <div className="glass-input relative flex items-end gap-3 p-3 rounded-[28px] bg-gray-900/80 border border-white/10 shadow-2xl backdrop-blur-xl">
-                                <button type="button" className="p-3 text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-700 rounded-full transition-colors self-end mb-0.5" disabled={isLocked}>
-                                    <Plus size={20} />
-                                </button>
-
-                                <textarea
-                                    ref={inputRef}
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder={isLocked ? "이 별자리는 완성되었습니다" : "Message Sidera..."}
-                                    rows={1}
-                                    disabled={isLocked}
-                                    className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 text-lg resize-none min-h-[48px] max-h-[200px] py-3 px-2 hide-scrollbar disabled:cursor-not-allowed"
-                                    onCompositionStart={() => isComposing.current = true}
-                                    onCompositionEnd={() => isComposing.current = false}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            if (isComposing.current) return; // Prevent duplicate submit
-                                            e.preventDefault();
-                                            handleSubmit(e);
-                                        }
-                                    }}
-                                />
-
-                                <div className="flex items-center gap-2 self-end mb-0.5">
-                                    <button type="button" className="p-3 text-gray-400 hover:text-white transition-colors hover:bg-white/5 rounded-full">
-                                        <Mic size={20} />
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className={clsx(
-                                            "p-3 rounded-full transition-all duration-300 shadow-lg",
-                                            inputValue.trim()
-                                                ? "bg-white text-black hover:scale-105 hover:bg-accent hover:text-black"
-                                                : "bg-gray-800 text-gray-600 cursor-not-allowed"
-                                        )}
-                                        disabled={!inputValue.trim()}
-                                    >
-                                        <Send size={18} className={inputValue.trim() ? "fill-current" : ""} />
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
                         <div className="text-center mt-3 text-[11px] text-gray-500 font-medium tracking-wide">
                             Sidera employs generative AI. Verification of astronomical data is recommended.
                         </div>

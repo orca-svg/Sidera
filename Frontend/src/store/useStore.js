@@ -405,7 +405,11 @@ export const useStore = create((set, get) => ({
       const res = await client.post(`/projects/${projectId}/complete`, { constellationName });
       const { project, imageGenerated } = res.data;
 
+      console.log('[Store] completeProject result:', { imageGenerated, imageUrl: project.constellationImageUrl?.substring(0, 50) + '...' });
+
       // Update local projects array
+      // Always add to completedImages if there's an imageUrl (placeholder or generated)
+      const hasImage = !!project.constellationImageUrl;
       set(state => ({
         projects: state.projects.map(p =>
           p.id === projectId
@@ -417,8 +421,7 @@ export const useStore = create((set, get) => ({
             }
             : p
         ),
-        // Add to completedImages if image was generated
-        completedImages: imageGenerated
+        completedImages: hasImage
           ? [...state.completedImages, {
             projectId,
             constellationName: project.constellationName,
@@ -427,7 +430,7 @@ export const useStore = create((set, get) => ({
           : state.completedImages
       }));
 
-      return { success: true, imageGenerated, imageUrl: project.constellationImageUrl };
+      return { success: true, imageGenerated: hasImage, imageUrl: project.constellationImageUrl };
     } catch (err) {
       console.error("[Store] completeProject Error:", err);
       return { success: false, imageGenerated: false, error: err.response?.data?.message || err.message };
@@ -441,6 +444,7 @@ export const useStore = create((set, get) => ({
 
     try {
       const res = await client.get('/projects/completed-images');
+      console.log('[Store] fetchCompletedImages response:', res.data?.length, 'images');
       set({ completedImages: res.data });
     } catch (err) {
       console.error("[Store] fetchCompletedImages Error:", err);

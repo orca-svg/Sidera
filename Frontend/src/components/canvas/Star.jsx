@@ -14,18 +14,20 @@ export function Star({ position, node, isSelected, onClick }) {
     // Destructure node properties
     const { importance, keywords, topicSummary, starLabel } = node
 
+    const sparklesRef = useRef()
+
     // 2. Visual Config based on Importance
     const getConfig = () => {
         switch (importance) {
             case 5: return {
                 distort: 0.4, speed: 2, roughness: 0.1,
                 haloOpacity: 0.1, haloScale: 3,
-                sparkles: 15, sparkleScale: 8
+                sparkles: 12, sparkleScale: 8 // Restored but slightly reduced
             }
             case 4: return {
                 distort: 0.3, speed: 1.5, roughness: 0.2,
                 haloOpacity: 0.05, haloScale: 2.5,
-                sparkles: 8, sparkleScale: 6
+                sparkles: 6, sparkleScale: 6 // Restored
             }
             case 3: return {
                 distort: 0.2, speed: 1.0, roughness: 0.3,
@@ -86,6 +88,10 @@ export function Star({ position, node, isSelected, onClick }) {
         if (haloRef.current) {
             haloRef.current.rotation.x += delta * 0.2
             haloRef.current.rotation.z += delta * 0.2
+        }
+        if (sparklesRef.current) {
+            sparklesRef.current.rotation.y -= delta * 0.1 // Much slower orbit
+            sparklesRef.current.rotation.x += delta * 0.05 // Gentle tilt
         }
     })
 
@@ -170,16 +176,18 @@ export function Star({ position, node, isSelected, onClick }) {
                 </Sphere>
             )}
 
-            {/* Scalable Sparkles */}
+            {/* Scalable Sparkles - Orbiting */}
             {config.sparkles > 0 && (
-                <Sparkles
-                    count={config.sparkles}
-                    scale={baseSize * config.sparkleScale}
-                    size={2}
-                    speed={0.4}
-                    opacity={0.5}
-                    color={color}
-                />
+                <group ref={sparklesRef}>
+                    <Sparkles
+                        count={config.sparkles}
+                        scale={baseSize * config.sparkleScale}
+                        size={2}
+                        speed={0.1} // Minimized flashing
+                        opacity={0.3} // Softer, less bright
+                        color={color}
+                    />
+                </group>
             )}
         </group>
     )

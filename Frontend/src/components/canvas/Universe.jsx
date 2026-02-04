@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { CameraControls, Stars, useTexture } from '@react-three/drei'
+import { CameraControls, Stars, useTexture, Sphere, MeshDistortMaterial } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useStore } from '../../store/useStore'
 import { useEventListener } from '../../hooks/useEventListener'
@@ -10,7 +10,7 @@ import { WarpField } from './WarpField'
 import * as THREE from 'three'
 
 // --- Completed Constellation Backgrounds ---
-// Hash function to deterministically place images in 3D space
+// Hash function to deterministically place constellations in 3D space
 function hashId(id) {
     let h = 0
     for (let i = 0; i < id.length; i++) {
@@ -20,37 +20,155 @@ function hashId(id) {
     return Math.abs(h) / 2147483647
 }
 
-// Single image plane component
-function CompletedImagePlane({ imageUrl, position, rotation }) {
-    const texture = useTexture(imageUrl)
+// Mini star for background constellation - smaller and dimmer
+function BackgroundStar({ position, importance }) {
+    // Smaller sizes for background
+    const size = 0.08 + (importance ?? 2) * 0.03
+
+    // Config based on importance
+    const config = importance >= 5 ? { color: '#FFD700', emissive: '#FFaa00', distort: 0.4, speed: 2 } :
+        importance >= 4 ? { color: '#00FFFF', emissive: '#0088FF', distort: 0.3, speed: 1.5 } :
+            { color: '#5566AA', emissive: '#223355', distort: 0, speed: 0 }
+
     return (
-        <mesh position={position} rotation={rotation}>
-            <planeGeometry args={[28, 28]} />
-            <meshBasicMaterial map={texture} transparent opacity={0.13} side={THREE.DoubleSide} toneMapped={false} />
-        </mesh>
+        <group position={position}>
+            {config.distort > 0 ? (
+                <Sphere args={[size, 16, 16]}>
+                    <MeshDistortMaterial
+                        color={config.color}
+                        emissive={config.emissive}
+                        emissiveIntensity={2}
+                        roughness={0.1}
+                        metalness={0.8}
+                        distort={config.distort}
+                        speed={config.speed}
+                        transparent
+                        opacity={0.8}
+                    />
+                </Sphere>
+            ) : (
+                <mesh>
+                    <sphereGeometry args={[size, 8, 8]} />
+                    <meshStandardMaterial
+                        color={config.color}
+                        emissive={config.emissive}
+                        emissiveIntensity={1}
+                        transparent
+                        opacity={0.6}
+                    />
+                </mesh>
+            )}
+        </group>
     )
 }
 
-// Container for all completed constellation background images
+// Mini edge for background constellation - very subtle
+function BackgroundEdge({ start, end, type }) {
+    const points = [new THREE.Vector3(...start), new THREE.Vector3(...end)]
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+
+    // Explicit edges slightly more visible
+    const color = type === 'explicit' ? '#336688' : '#223344'
+    const opacity = type === 'explicit' ? 0.25 : 0.12
+
+    return (
+        <line geometry={lineGeometry}>
+            <lineBasicMaterial color={color} transparent opacity={opacity} />
+        </line>
+    )
+}
+
+// Single background constellation (positioned and scaled)
+function BackgroundConstellation({ constellation, offset, scale }) {
+    const { nodes, edges } = constellation
+
+    // Create node map for edge lookup
+    const nodeMap = new Map(nodes.map(n => [n.id.toString(), n]))
+
+    // Convert position object {x,y,z} to array [x,y,z] and apply scale/offset
+    const getPosition = (pos) => {
+        if (!pos) return offset // Default to offset if no position
+        const x = Array.isArray(pos) ? pos[0] : (pos.x ?? 0)
+        const y = Array.isArray(pos) ? pos[1] : (pos.y ?? 0)
+        const z = Array.isArray(pos) ? pos[2] : (pos.z ?? 0)
+        return [
+            x * scale + offset[0],
+            y * scale + offset[1],
+            z * scale + offset[2]
+        ]
+    }
+
+    return (
+        <group>
+            {/* Render edges first (behind stars) */}
+            {edges.map((edge, i) => {
+                const sourceNode = nodeMap.get(edge.source?.toString())
+                const targetNode = nodeMap.get(edge.target?.toString())
+                if (!sourceNode || !targetNode) return null
+                return (
+                    <BackgroundEdge
+                        key={`e-${i}`}
+                        start={getPosition(sourceNode.position)}
+                        end={getPosition(targetNode.position)}
+                        type={edge.type}
+                    />
+                )
+            })}
+
+            {/* Render stars */}
+            {nodes.map((node, i) => (
+                <BackgroundStar
+                    key={`n-${i}`}
+                    position={getPosition(node.position)}
+                    importance={node.importance}
+                />
+            ))}
+        </group>
+    )
+}
+
+// Container for all completed constellation backgrounds
 function CompletedConstellationBackgrounds() {
     const completedImages = useStore(state => state.completedImages)
-    const toShow = completedImages.filter(item => item.imageUrl)
+    const activeProjectId = useStore(state => state.activeProjectId)
+    const viewMode = useStore(state => state.viewMode)
+
+    // Hide in chat mode
+    if (viewMode === 'chat') return null
+
+    // Filter: has nodes AND not the current project
+    const toShow = completedImages.filter(item =>
+        item.nodes?.length > 0 &&
+        item.projectId.toString() !== activeProjectId?.toString()
+    )
 
     if (toShow.length === 0) return null
 
     return (
         <>
-            {toShow.map(item => {
-                const h = hashId(item.projectId)
-                const h2 = (h * 7.3) % 1  // Secondary hash for y-axis variety
+            {toShow.map((item, index) => {
+                const h = hashId(item.projectId.toString())
+                const h2 = (h * 7.3) % 1
+                const h3 = (h * 13.7) % 1
+
+                // Much wider distribution: X ±80, Y ±40, Z -60 ~ -120
+                const offset = [
+                    (h * 2 - 1) * 80,
+                    (h2 * 2 - 1) * 40,
+                    -60 - h3 * 60
+                ]
+
+                // Scale based on distance (farther = smaller for perspective)
+                const distanceFactor = (Math.abs(offset[2]) - 60) / 60 + 1
+                const scale = 0.35 / distanceFactor
+
                 return (
-                    <Suspense key={item.projectId} fallback={null}>
-                        <CompletedImagePlane
-                            imageUrl={item.imageUrl}
-                            position={[(h * 2 - 1) * 45, (h2 * 2 - 1) * 15, -70 - h * 40]}
-                            rotation={[0.05, (h * 2 - 1) * 0.25, 0]}
-                        />
-                    </Suspense>
+                    <BackgroundConstellation
+                        key={item.projectId}
+                        constellation={item}
+                        offset={offset}
+                        scale={scale}
+                    />
                 )
             })}
         </>
