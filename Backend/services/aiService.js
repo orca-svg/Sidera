@@ -263,10 +263,62 @@ async function generateTitle(text) {
     } catch (e) { return "New Conversation"; }
 }
 
+/**
+ * Generate constellation background image using Imagen 3.0
+ * @param {string} constellationName - Name of the constellation
+ * @returns {Promise<string|null>} - Base64 data URI or null on failure
+ */
+async function generateConstellationImage(constellationName) {
+    if (!apiKey) {
+        console.warn("[Imagen] No API key available");
+        return null;
+    }
+
+    const prompt = `A breathtaking cosmic nebula scene representing "${constellationName}", dark deep space, vibrant nebula in purple blue gold, connected bright stars forming a constellation pattern, ethereal glow, dreamy cinematic, no text no watermarks no human figures`;
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instances: [{ prompt }],
+                    parameters: {
+                        sampleCount: 1,
+                        aspectRatio: "1:1",
+                        safetyFilterLevel: "BLOCK_FEWEST"
+                    }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            console.error("[Imagen] API error:", response.status, await response.text());
+            return null;
+        }
+
+        const data = await response.json();
+        const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
+
+        if (!base64Image) {
+            console.warn("[Imagen] No image in response");
+            return null;
+        }
+
+        // Return as data URI
+        return `data:image/png;base64,${base64Image}`;
+    } catch (err) {
+        console.error("[Imagen] Generation failed:", err.message);
+        return null;
+    }
+}
+
 module.exports = {
     generateResponse,
     getEmbedding,
     generateTitle,
+    generateConstellationImage,
     SideraConfig,
     calculateImportanceMetrics,
     calculateStarRating

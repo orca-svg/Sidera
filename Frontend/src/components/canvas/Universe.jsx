@@ -1,6 +1,6 @@
-import { useRef, useEffect, useMemo, useCallback } from 'react'
+import { useRef, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { CameraControls, Stars } from '@react-three/drei'
+import { CameraControls, Stars, useTexture } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useStore } from '../../store/useStore'
 import { useEventListener } from '../../hooks/useEventListener'
@@ -8,6 +8,54 @@ import { Star } from './Star'
 import { Constellation } from './Constellation'
 import { WarpField } from './WarpField'
 import * as THREE from 'three'
+
+// --- Completed Constellation Backgrounds ---
+// Hash function to deterministically place images in 3D space
+function hashId(id) {
+    let h = 0
+    for (let i = 0; i < id.length; i++) {
+        h = ((h << 5) - h) + id.charCodeAt(i)
+        h |= 0
+    }
+    return Math.abs(h) / 2147483647
+}
+
+// Single image plane component
+function CompletedImagePlane({ imageUrl, position, rotation }) {
+    const texture = useTexture(imageUrl)
+    return (
+        <mesh position={position} rotation={rotation}>
+            <planeGeometry args={[28, 28]} />
+            <meshBasicMaterial map={texture} transparent opacity={0.13} side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+    )
+}
+
+// Container for all completed constellation background images
+function CompletedConstellationBackgrounds() {
+    const completedImages = useStore(state => state.completedImages)
+    const toShow = completedImages.filter(item => item.imageUrl)
+
+    if (toShow.length === 0) return null
+
+    return (
+        <>
+            {toShow.map(item => {
+                const h = hashId(item.projectId)
+                const h2 = (h * 7.3) % 1  // Secondary hash for y-axis variety
+                return (
+                    <Suspense key={item.projectId} fallback={null}>
+                        <CompletedImagePlane
+                            imageUrl={item.imageUrl}
+                            position={[(h * 2 - 1) * 45, (h2 * 2 - 1) * 15, -70 - h * 40]}
+                            rotation={[0.05, (h * 2 - 1) * 0.25, 0]}
+                        />
+                    </Suspense>
+                )
+            })}
+        </>
+    )
+}
 
 function InteractiveBackground({ children }) {
     const ref = useRef()
@@ -215,6 +263,9 @@ export function Universe({ isInteractive = true }) {
                 <InteractiveBackground>
                     {/* Layer 1: Persistent Background Stars (Always visible with Parallax) */}
                     <Stars radius={300} depth={50} count={visualConfig.starCount} factor={4} saturation={0} fade speed={1} />
+
+                    {/* Layer 1.5: Completed Constellation Background Images */}
+                    <CompletedConstellationBackgrounds />
 
                     {/* Layer 2: Construct/Knowledge Graph (Visible only in Constellation Mode) */}
                     <AnimatedUniverse>

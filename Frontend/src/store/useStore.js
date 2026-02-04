@@ -5,6 +5,7 @@ export const useStore = create((set, get) => ({
   // --- State ---
   projects: [],        // Sidebar Project List
   activeProjectId: null,
+  completedImages: [],  // [{ projectId, constellationName, imageUrl }]
 
   nodes: [],           // Current Conversation Nodes (Stars)
   edges: [],           // Connections (optional visual)
@@ -40,7 +41,7 @@ export const useStore = create((set, get) => ({
         set({ viewMode: 'chat' });
       }
     } else {
-      set({ projects: [], nodes: [], activeProjectId: null });
+      set({ projects: [], nodes: [], activeProjectId: null, completedImages: [] });
     }
   },
 
@@ -54,11 +55,14 @@ export const useStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await client.get('/projects');
-      // Map API response to UI format
+      // Map API response to UI format (including completion fields)
       const projects = res.data.map(p => ({
         id: p._id,
         title: p.name,
-        lastUpdated: p.updatedAt || p.createdAt
+        lastUpdated: p.updatedAt || p.createdAt,
+        status: p.status || 'active',
+        constellationName: p.constellationName || null,
+        constellationImageUrl: p.constellationImageUrl || null
       }));
       // Sort by latest msg? typically backend does this, or we sort here
       projects.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
@@ -395,6 +399,54 @@ export const useStore = create((set, get) => ({
 
   setActiveNode: (id) => set({ activeNode: id }),
 
+  // 9. Complete Project (End Conversation)
+  completeProject: async (projectId, constellationName) => {
+    try {
+      const res = await client.post(`/projects/${projectId}/complete`, { constellationName });
+      const { project, imageGenerated } = res.data;
+
+      // Update local projects array
+      set(state => ({
+        projects: state.projects.map(p =>
+          p.id === projectId
+            ? {
+              ...p,
+              status: 'completed',
+              constellationName: project.constellationName,
+              constellationImageUrl: project.constellationImageUrl
+            }
+            : p
+        ),
+        // Add to completedImages if image was generated
+        completedImages: imageGenerated
+          ? [...state.completedImages, {
+            projectId,
+            constellationName: project.constellationName,
+            imageUrl: project.constellationImageUrl
+          }]
+          : state.completedImages
+      }));
+
+      return { success: true, imageGenerated, imageUrl: project.constellationImageUrl };
+    } catch (err) {
+      console.error("[Store] completeProject Error:", err);
+      return { success: false, imageGenerated: false, error: err.response?.data?.message || err.message };
+    }
+  },
+
+  // 10. Fetch Completed Images (for background display)
+  fetchCompletedImages: async () => {
+    const { user } = get();
+    if (user?.isGuest) return; // Guests have no persistent data
+
+    try {
+      const res = await client.get('/projects/completed-images');
+      set({ completedImages: res.data });
+    } catch (err) {
+      console.error("[Store] fetchCompletedImages Error:", err);
+    }
+  },
+
   // Initial App Load
   initializeProject: async () => {
     const { user } = get();
@@ -406,6 +458,7 @@ export const useStore = create((set, get) => ({
     }
 
     await get().fetchProjects();
+    await get().fetchCompletedImages(); // Also fetch completed images for background
     const { projects } = get();
     if (projects.length === 0) {
       await get().createProject();

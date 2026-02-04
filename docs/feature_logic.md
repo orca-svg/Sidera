@@ -151,3 +151,97 @@
 - `Frontend/src/store/useStore.js`: `searchNodes` 함수
 - `Backend/routes/nodes.js`: 검색 API 엔드포인트
 
+---
+
+## 7. 별자리 완성 (Constellation Completion)
+
+대화를 "완성"하여 읽기 전용으로 보존하고, AI 생성 이미지로 영구 기념하는 기능입니다.
+
+### 완성 플로우
+
+```
+[사용자: "이 별자리를 완성하기" 클릭]
+         ↓
+[모달: 2D 미리보기 + 이름 입력]
+         ↓
+[Imagen 3.0 API: 성운 이미지 생성]
+         ↓
+[프로젝트 잠금 (status: 'completed')]
+         ↓
+[배경에 이미지 표시 (다른 대화에서)]
+```
+
+### A. 프로젝트 잠금 (Read-Only Lock)
+
+| 상태 | 동작 |
+|------|------|
+| **채팅 입력** | 비활성화 + "이 별자리는 완성되었습니다" 메시지 |
+| **백엔드** | `POST /chat` 요청 시 403 + `PROJECT_COMPLETED` 코드 반환 |
+| **사이드바** | MessageSquare 아이콘 → ✦ 아이콘으로 변경 |
+| **이름 변경** | Edit 버튼 숨김 (삭제만 가능) |
+
+### B. Imagen 3.0 이미지 생성
+
+- **엔드포인트**: `POST /api/projects/:id/complete`
+- **프롬프트**: 
+  ```
+  A breathtaking cosmic nebula scene representing "${constellationName}", 
+  dark deep space, vibrant nebula in purple blue gold, 
+  connected bright stars, ethereal glow, dreamy cinematic, 
+  no text no watermarks
+  ```
+- **Graceful Degradation**: 이미지 생성 실패 시에도 프로젝트는 정상 완료됨 (이름만 저장)
+
+### C. 완성 모달 (EndConversationModal)
+
+**3단계 플로우:**
+
+| 단계 | 내용 |
+|------|------|
+| **input** | 2D Canvas 별자리 미리보기 + 이름 입력 |
+| **generating** | 스피너 + "별자리를 완성하고 있습니다..." |
+| **success** | 생성된 이미지 (또는 실패 안내) + 확인 버튼 |
+
+**2D 미리보기 시각화:**
+- 노드 색상: 중요도별 (5★=#FFD700, 4★=#00FFFF, 3★=#88AAFF, 2★=#FFF, 1★=#888)
+- 엣지: 연한 파란색 선으로 연결
+
+### D. 완료된 별자리 배경 이미지
+
+다른 대화의 별자리 모드에서 모든 완료된 별자리 이미지가 배경에 표시됩니다.
+
+| 속성 | 값 |
+|------|------|
+| **크기** | 28×28 Three.js units |
+| **투명도** | 0.13 (은은한 배경 효과) |
+| **위치** | z = -70 ~ -110 (깊은 배경) |
+| **배치** | projectId 해시 기반 결정적 위치 |
+
+### E. Backend 스키마 (Project)
+
+```javascript
+status: { type: String, enum: ['active', 'completed'], default: 'active' }
+completedAt: { type: Date, default: null }
+constellationName: { type: String, default: null }
+constellationImageUrl: { type: String, default: null }  // base64 data URI
+```
+
+### F. Frontend Store 상태
+
+```javascript
+completedImages: []  // [{ projectId, constellationName, imageUrl }]
+
+// 액션
+completeProject(projectId, constellationName)  // POST /projects/:id/complete
+fetchCompletedImages()                          // GET /projects/completed-images
+```
+
+### 관련 파일
+- `Backend/models/Project.js`: 완료 관련 스키마 필드
+- `Backend/services/aiService.js`: `generateConstellationImage` 함수
+- `Backend/routes/projects.js`: `/completed-images`, `/:id/complete` 엔드포인트
+- `Backend/routes/chat.js`: 완료된 프로젝트 잠금 체크
+- `Frontend/src/store/useStore.js`: `completeProject`, `fetchCompletedImages` 액션
+- `Frontend/src/components/layout/EndConversationModal.jsx`: 완성 모달 컴포넌트
+- `Frontend/src/components/layout/MainLayout.jsx`: 완성 버튼, 잠금 UI
+- `Frontend/src/components/canvas/Universe.jsx`: 배경 이미지 렌더링
