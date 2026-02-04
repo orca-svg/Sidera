@@ -15,6 +15,7 @@ import { TopicList } from './TopicList'
 import { HelpModal } from './HelpModal'
 import { SettingsModal } from './SettingsModal'
 import { EndConversationModal } from './EndConversationModal'
+import { ShareModal } from './ShareModal'
 import { useAuth } from '../../auth/AuthContext'
 
 
@@ -274,22 +275,19 @@ export function MainLayout() {
         if (window.innerWidth < 768) setIsSidebarOpen(false)
     }
 
+    // Share Modal State
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+    const [capturedImageData, setCapturedImageData] = useState(null)
+
     const handleCapture = () => {
         // Find the canvas element
         const canvas = document.querySelector('canvas')
         if (!canvas) return
 
         try {
-            // Create a temporary link
-            const link = document.createElement('a')
-            const date = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
-            link.download = `Sidera_Capture_${date}.png`
-            link.href = canvas.toDataURL('image/png')
-
-            // Trigger download
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
+            const imageData = canvas.toDataURL('image/png')
+            setCapturedImageData(imageData)
+            setIsShareModalOpen(true)
         } catch (err) {
             console.error("Capture failed:", err)
         }
@@ -305,6 +303,17 @@ export function MainLayout() {
 
             <AnimatePresence>
                 {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
+            </AnimatePresence>
+
+            {/* Share Modal */}
+            <AnimatePresence>
+                {isShareModalOpen && (
+                    <ShareModal
+                        isOpen={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        imageData={capturedImageData}
+                    />
+                )}
             </AnimatePresence>
 
             {/* Observatory Mode Hints */}
