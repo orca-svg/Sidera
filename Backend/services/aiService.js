@@ -36,7 +36,12 @@ async function getEmbedding(text) {
     try {
         if (!text || typeof text !== 'string') return [];
         // Use retry for embeddings too
-        const result = await retryWithBackoff(() => embeddingModel.embedContent(text));
+        // CRITICAL: Use taskType to prevent false positive similarity (e.g., "baseball" vs "physics")
+        // Without taskType, unrelated topics may produce inflated similarity scores
+        const result = await retryWithBackoff(() => embeddingModel.embedContent({
+            content: { parts: [{ text: text }] },
+            taskType: "SEMANTIC_SIMILARITY"  // Required for proper topic discrimination
+        }));
         return result.embedding.values;
     } catch (error) {
         console.error("Error generating embedding:", error);

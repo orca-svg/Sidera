@@ -258,4 +258,41 @@ fetchCompletedImages()                          // GET /projects/completed-image
 - `Frontend/src/store/useStore.js`: `completeProject`, `fetchCompletedImages` 액션
 - `Frontend/src/components/layout/EndConversationModal.jsx`: 완성 모달 컴포넌트
 - `Frontend/src/components/layout/MainLayout.jsx`: 완성 버튼, 잠금 UI
-- `Frontend/src/components/canvas/Universe.jsx`: 배경 이미지 렌더링
+- `Frontend/src/components/canvas/Universe.jsx`: 배경 이미지 렌더링 (BackgroundConstellations)
+
+---
+
+## 8. 천문대 모드 (Observatory Mode)
+
+완료된 별자리들을 한눈에 감상하고 탐색할 수 있는 갤러리 모드입니다.
+
+### A. 동적 카메라 피팅 (Dynamic Camera Fitting)
+- **문제**: 별자리들의 개수나 분포가 다양해 고정된 카메라 거리로는 너무 멀거나 가깝게 보였습니다.
+- **해결**: 모든 별자리의 위치(Bounding Box)를 계산하여 최대 범위를 구한 후, 카메라 거리를 동적으로 설정합니다.
+- **공식**: `targetZ = Math.max(80, maxExtent * 1.5)`
+    - *1.5 Multiplier*: 별자리가 화면에 꽉 차 보이도록 타이트하게("Tighter Fit") 조정했습니다.
+
+### B. 스마트 이름표 (Smart Labels)
+별자리 이름표가 별을 가리거나 시야를 방해하지 않도록 정교한 로직이 적용되었습니다.
+
+| 기능 | 설명 |
+|------|------|
+| **근접 감지 (Proximity)** | 카메라가 특정 별자리에 가까워지면(거리 150 미만) 자동으로 이름표가 나타납니다. |
+| **하단 앵커링 (Bottom Anchor)** | 이름표는 항상 별자리의 **가장 아래쪽 별(minY)**보다 밑에 위치하여, 별자리를 절대 가리지 않습니다. |
+| **동적 오프셋 (Inverted Offset)** | - **가까울 때 (Zoom In)**: 별의 시각적 크기가 커지므로, 오프셋을 **80px**로 늘려 겹침을 방지합니다.<br>- **멀 때 (Zoom Out)**: 연결성을 위해 오프셋을 **30px**로 줄입니다. |
+
+---
+
+## 9. 별 핀/라벨 (Star Pins/Labels)
+
+개별 노드(별)에 표시되는 텍스트 라벨의 동작 방식입니다.
+
+### 표시 조건
+- **기존**: 중요도 5점 이상은 항상 표시.
+- **변경**: **Hover** 또는 **Select** 상태일 때만 표시하여, 평상시에는 우주의 고요함을 유지하고 정보 과부하를 방지합니다.
+
+### 동적 스케일링 (Dynamic Scaling)
+카메라 거리에 따라 핀의 크기가 부드럽게 조절됩니다.
+- 멀리 있을 때 너무 작아지지 않도록 최소 크기(0.7)를 보장합니다.
+- 공식: `scale = Math.max(0.7, Math.min(1.2, 30 / distance))`
+

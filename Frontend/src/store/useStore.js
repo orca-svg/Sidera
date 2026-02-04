@@ -452,9 +452,7 @@ export const useStore = create((set, get) => ({
 
       console.log('[Store] completeProject result:', { imageGenerated, imageUrl: project.constellationImageUrl?.substring(0, 50) + '...' });
 
-      // Update local projects array
-      // Always add to completedImages if there's an imageUrl (placeholder or generated)
-      const hasImage = !!project.constellationImageUrl;
+      // Update local projects array (mark as completed)
       set(state => ({
         projects: state.projects.map(p =>
           p.id === projectId
@@ -465,17 +463,14 @@ export const useStore = create((set, get) => ({
               constellationImageUrl: project.constellationImageUrl
             }
             : p
-        ),
-        completedImages: hasImage
-          ? [...state.completedImages, {
-            projectId,
-            constellationName: project.constellationName,
-            imageUrl: project.constellationImageUrl
-          }]
-          : state.completedImages
+        )
       }));
 
-      return { success: true, imageGenerated: hasImage, imageUrl: project.constellationImageUrl };
+      // Fetch complete data (with nodes/edges) for Observatory display
+      // This ensures the new constellation appears with full 3D rendering data
+      await get().fetchCompletedImages();
+
+      return { success: true, imageGenerated: !!project.constellationImageUrl, imageUrl: project.constellationImageUrl };
     } catch (err) {
       console.error("[Store] completeProject Error:", err);
       return { success: false, imageGenerated: false, error: err.response?.data?.message || err.message };
