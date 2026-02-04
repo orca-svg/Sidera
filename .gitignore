@@ -12,3 +12,6 @@ openspec/*
 
 CLAUDE.md
 react-optimization-report.html
+
+# Debug Scripts
+Backend/debug_*.js
