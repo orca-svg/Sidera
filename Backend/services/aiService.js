@@ -282,52 +282,6 @@ function calculateStarRating(score, scoreHistory = [], rootScore = null) {
     return 1;
 }
 
-// --- CORE AI SERVICES ---
-
-async function getEmbedding(text) {
-    if (!apiKey || !text) return null;
-    try {
-        // DEBUG LOG
-        console.log(`[Embedding Input] "${text.substring(0, 40)}..." (len: ${text.length})`);
-
-        // Specify taskType for better separation
-        const result = await embeddingModel.embedContent({
-            content: { role: "user", parts: [{ text }] },
-            taskType: "SEMANTIC_SIMILARITY"
-        });
-        return result.embedding.values;
-    } catch (error) {
-        console.error("[Embedding Error]", error);
-        return null;
-    }
-}
-
-// NEW: Translate and Embed (Fix for Korean Vector Collapse)
-async function getEnglishEmbedding(text) {
-    if (!apiKey || !text) return null;
-    try {
-        // 1. Translate
-        // Use a separate prompt just for translation to avoid context pollution
-        const translationResult = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: `Translate the following Korean text to English for technical classification. Return ONLY the English text, no explanations.\n\nText: "${text}"` }] }]
-        });
-        const englishText = translationResult.response.text().trim();
-        console.log(`[Translation] "${text.substring(0, 15)}..." -> "${englishText.substring(0, 30)}..."`);
-
-        // 2. Embed
-        return await getEmbedding(englishText);
-    } catch (error) {
-        console.error("[English Embedding Error]", error);
-        return null; // Fallback
-    }
-}
-
-
-
-async function generateTitle(text) {
-    // ...
-}
-
 // NEW: Translate and Embed (Fix for Korean Vector Collapse)
 async function getEnglishEmbedding(text) {
     if (!apiKey || !text) return null;
