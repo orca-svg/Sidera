@@ -1,13 +1,56 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html, Sphere, Sparkles, MeshDistortMaterial } from '@react-three/drei'
 import { useStore } from '../../store/useStore'
 import { Bookmark } from 'lucide-react'
 import clsx from 'clsx'
+import * as THREE from 'three'
+
+// Helper component for dynamic label scaling
+function LabelContent({
+    topicSummary, starLabel, keywords,
+    lineColor, lineShadow, borderColor, shadowColor, themeColor,
+    groupPosition
+}) {
+    const labelRef = useRef()
+
+    useFrame((state) => {
+        if (!labelRef.current) return
+
+        // Calculate distance from camera to star
+        const currentPos = new THREE.Vector3(...groupPosition)
+        const distance = state.camera.position.distanceTo(currentPos)
+
+        // Dynamic Scale Logic:
+        // Base scale factor (adjust 20 to change 'zoom' feeling)
+        // Min scale 0.5 (readable), Max scale 1.2 (not too huge)
+        const scale = Math.max(0.4, Math.min(1.2, 25 / distance))
+
+        labelRef.current.style.transform = `scale(${scale})`
+        labelRef.current.style.opacity = scale < 0.45 ? 0.5 : 1 // Fade out slightly if very far (optional polish)
+    })
+
+    return (
+        <div ref={labelRef} className="flex flex-col-reverse items-center transform -translate-y-[50%] pb-2 transition-transform duration-75 ease-out origin-bottom">
+            <div className={clsx("w-px h-10 transition-all duration-300", lineColor, lineShadow)} />
+            <div className={clsx(
+                "mb-1 px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-xl transition-all duration-300 pointer-events-auto flex items-center gap-2",
+                "bg-black/80 text-sm whitespace-nowrap",
+                borderColor, shadowColor
+            )}>
+                <span className={clsx("font-bold animate-pulse", themeColor)}>●</span>
+                <span className="text-gray-100 font-mono tracking-wide text-center leading-tight">
+                    {topicSummary || starLabel || (keywords && keywords[0]) || "NODE"}
+                </span>
+            </div>
+        </div>
+    )
+}
 
 export function Star({ position, node, isSelected, onClick }) {
     const meshRef = useRef()
     const haloRef = useRef()
+    const labelRef = useRef() // Ref for HTML Label
     const [hovered, setHover] = useState(false)
     const { viewMode } = useStore()
 
@@ -93,9 +136,28 @@ export function Star({ position, node, isSelected, onClick }) {
             sparklesRef.current.rotation.y -= delta * 0.1 // Much slower orbit
             sparklesRef.current.rotation.x += delta * 0.05 // Gentle tilt
         }
+
+        // Dynamic Pin Scaling (Manual Clamp)
+        if (showLabel && labelRef.current && meshRef.current) {
+            const distance = state.camera.position.distanceTo(meshRef.current.position) // Approximate (Mesh is at 0 local)
+            // But mesh position is local 0,0,0 relative to parent group which is at 'position'
+            // Distance from camera to group position
+            const groupPos = new THREE.Vector3(...position)
+            const camDist = state.camera.position.distanceTo(groupPos)
+
+            // Scale Logic
+            // Adjusted: Min 0.7 (was 0.4) to keep readability at distance
+            // Factor 30 (was 25) to decay slower
+            const labelScale = Math.max(0.7, Math.min(1.2, 30 / camDist))
+
+            labelRef.current.style.transform = `scale(${labelScale})`
+            // Keep opacity 1 unless extremely far (though clamped scale prevents this now)
+            labelRef.current.style.opacity = 1
+            labelRef.current.style.transformOrigin = 'bottom center'
+        }
     })
 
-    // Label Logic - STRICT: Only show if hovered or selected (as requested)
+    // Label Logic - STRICT: Only show if hovered or selected
     const showLabel = viewMode === 'constellation' && (hovered || isSelected);
 
     return (
@@ -105,7 +167,6 @@ export function Star({ position, node, isSelected, onClick }) {
                 onPointerOver={(e) => { e.stopPropagation(); setHover(true); }}
                 onPointerOut={(e) => setHover(false)}
             >
-                {/* Material Switching */}
                 {useDistort ? (
                     <MeshDistortMaterial
                         color={color}
@@ -136,11 +197,13 @@ export function Star({ position, node, isSelected, onClick }) {
                 <Html
                     position={[0, baseSize, 0]}
                     center
-                    distanceFactor={15}
                     zIndexRange={[100, 0]}
                     style={{ pointerEvents: 'none' }}
                 >
-                    <div className="flex flex-col-reverse items-center transform -translate-y-[50%] pb-2">
+                    <div
+                        ref={labelRef}
+                        className="flex flex-col-reverse items-center transform -translate-y-[50%] pb-2 transition-transform duration-75 ease-out"
+                    >
                         <div className={clsx("w-px h-10 transition-all duration-300", lineColor, lineShadow)} />
                         <div className={clsx(
                             "mb-1 px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-xl transition-all duration-300 pointer-events-auto flex items-center gap-2",
@@ -183,8 +246,8 @@ export function Star({ position, node, isSelected, onClick }) {
                         count={config.sparkles}
                         scale={baseSize * config.sparkleScale}
                         size={2}
-                        speed={0.1} // Minimized flashing
-                        opacity={0.3} // Softer, less bright
+                        speed={0.1}
+                        opacity={0.3}
                         color={color}
                     />
                 </group>
@@ -192,3 +255,4 @@ export function Star({ position, node, isSelected, onClick }) {
         </group>
     )
 }
+
