@@ -44,6 +44,11 @@ export function MainLayout() {
     const searchNodes = useStore(state => state.searchNodes)
     const flyToNode = useStore(state => state.flyToNode)
     const completeProject = useStore(state => state.completeProject)
+    const completedImages = useStore(state => state.completedImages) // For Observatory Button
+    const observatoryFocusedConstellation = useStore(state => state.observatoryFocusedConstellation)
+    const observatoryHoveredConstellation = useStore(state => state.observatoryHoveredConstellation)
+    const enterConstellationFromObservatory = useStore(state => state.enterConstellationFromObservatory)
+    const setObservatoryFocusedConstellation = useStore(state => state.setObservatoryFocusedConstellation)
     const user = useStore(state => state.user) // Get synced user from store
 
     // Derived: Current project locked status
@@ -240,10 +245,27 @@ export function MainLayout() {
         }
     }, [activeNode]);
 
-    // ESC Key Listener for connection mode - Optimized: Use custom hook
+    // ESC & Enter Key Listener for connection mode
     useEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && viewMode === 'constellation') {
-            setViewMode('chat')
+        if (viewMode === 'constellation') {
+            if (e.key === 'Escape') setViewMode('chat')
+        } else if (viewMode === 'observatory') {
+            if (e.key === 'Escape') {
+                if (observatoryFocusedConstellation) {
+                    // Back to Overview
+                    setObservatoryFocusedConstellation(null)
+                } else {
+                    // Exit Observatory
+                    setViewMode('chat')
+                }
+            } else if (e.key === 'Enter') {
+                if (observatoryFocusedConstellation) {
+                    enterConstellationFromObservatory(observatoryFocusedConstellation.projectId)
+                } else if (observatoryHoveredConstellation) {
+                    // Also allow entering if just hovering
+                    enterConstellationFromObservatory(observatoryHoveredConstellation)
+                }
+            }
         }
     })
 
@@ -284,6 +306,39 @@ export function MainLayout() {
             <AnimatePresence>
                 {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
             </AnimatePresence>
+
+            {/* Observatory Mode Hints */}
+            {viewMode === 'observatory' && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className={clsx(
+                        "fixed bottom-8 right-0 z-50 pointer-events-none flex justify-center transition-all duration-300 ease-in-out",
+                        isSidebarOpen ? "md:left-[280px] w-full md:w-[calc(100%-280px)]" : "left-0 w-full"
+                    )}
+                >
+                    <div className="pointer-events-auto px-6 py-3 rounded-full bg-black/60 backdrop-blur-xl border border-purple-500/30 text-white text-sm flex items-center gap-3 shadow-[0_0_50px_rgba(168,85,247,0.5)]">
+                        <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                        <span className="text-purple-100 font-medium">Observatory Active</span>
+                        <span className="text-gray-400 border-l border-white/20 pl-3 ml-1 mr-2">
+                            {observatoryFocusedConstellation ? (
+                                <>Press <span className="font-bold text-white">Enter</span> to join or <span className="font-bold text-white">ESC</span> to back</>
+                            ) : (
+                                <>Click to explore or Press <span className="font-bold text-white">ESC</span> to exit</>
+                            )}
+                        </span>
+
+                        <button
+                            onClick={handleCapture}
+                            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition-colors border border-white/5 ml-2"
+                            title="Capture View"
+                        >
+                            <Camera size={16} />
+                        </button>
+                    </div>
+                </motion.div>
+            )}
 
             {/* LAYER 0: Background Universe */}
             <div className="absolute inset-0 z-0 pointer-events-auto">
@@ -355,6 +410,27 @@ export function MainLayout() {
                     >
                         <Plus size={18} className="text-gray-400 group-hover:text-accent transition-colors" />
                         <span className="text-sm font-medium">New chat</span>
+                    </button>
+
+                    {/* Observatory Button */}
+                    <button
+                        onClick={() => setViewMode('observatory')}
+                        disabled={isGuest || completedImages.length === 0}
+                        className={clsx(
+                            "w-full h-10 flex items-center gap-3 px-4 rounded-full transition-all duration-200 border group shadow-lg",
+                            viewMode === 'observatory'
+                                ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                                : "bg-gray-800/60 hover:bg-gray-700 text-gray-400 hover:text-white border-transparent hover:border-purple-500/30",
+                            (isGuest || completedImages.length === 0) && "opacity-50 cursor-not-allowed hidden" // Hide if empty
+                        )}
+                    >
+                        <Telescope size={18} className={clsx(viewMode === 'observatory' ? "text-purple-300" : "text-purple-400")} />
+                        <span className="text-sm font-medium">Observatory</span>
+                        {completedImages.length > 0 && (
+                            <span className="ml-auto text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">
+                                {completedImages.length}
+                            </span>
+                        )}
                     </button>
                 </div>
 
@@ -513,7 +589,10 @@ export function MainLayout() {
                                             )}
                                         >
                                             <button
-                                                onClick={() => setActiveProject(project.id)}
+                                                onClick={() => {
+                                                    setActiveProject(project.id);
+                                                    setViewMode('chat');
+                                                }}
                                                 className="flex-1 flex items-center gap-3 px-3 py-3 min-w-0 text-left"
                                             >
                                                 {/* Show ✦ for completed, MessageSquare for active */}
@@ -869,9 +948,9 @@ export function MainLayout() {
                             isSidebarOpen ? "md:left-[280px] w-full md:w-[calc(100%-280px)]" : "left-0 w-full"
                         )}
                     >
-                        <div className="pointer-events-auto px-6 py-3 rounded-full bg-black/50 backdrop-blur-xl border border-white/10 text-white text-sm flex items-center gap-3 shadow-2xl">
-                            <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
-                            <span>Constellation Mode Active</span>
+                        <div className="pointer-events-auto px-6 py-3 rounded-full bg-black/60 backdrop-blur-xl border border-amber-500/30 text-white text-sm flex items-center gap-3 shadow-[0_0_50px_rgba(245,158,11,0.5)]">
+                            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+                            <span className="text-amber-100 font-medium">Constellation Mode Active</span>
                             <span className="text-gray-400 border-l border-white/20 pl-3 ml-1 mr-2">Press <span className="font-bold text-white">ESC</span> to return</span>
 
                             <button

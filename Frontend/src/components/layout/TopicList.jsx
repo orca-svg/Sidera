@@ -14,7 +14,7 @@ export function TopicList() {
   // Sort by creation order (oldest first)
   const tocNodes = [...nodes].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-  if (nodes.length === 0) return null;
+  if (nodes.length === 0 || viewMode === 'observatory') return null;
 
   // Determine button text based on mode and lock status
   const getButtonText = () => {

@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { CameraControls, Stars, useTexture, Sphere, MeshDistortMaterial } from '@react-three/drei'
+import { CameraControls, Stars, useTexture, Sphere, MeshDistortMaterial, Html } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useStore } from '../../store/useStore'
 import { useEventListener } from '../../hooks/useEventListener'
+import { InteractiveConstellation } from './InteractiveConstellation'
 import { Star } from './Star'
 import { Constellation } from './Constellation'
 import { WarpField } from './WarpField'
@@ -127,14 +128,65 @@ function BackgroundConstellation({ constellation, offset, scale }) {
     )
 }
 
+// --- Observatory View Component ---
+function ObservatoryView() {
+    const { completedImages, viewMode, observatoryHoveredConstellation,
+        observatoryFocusedConstellation, setObservatoryHoveredConstellation,
+        setObservatoryFocusedConstellation } = useStore()
+
+    if (viewMode !== 'observatory') return null
+
+    const toShow = completedImages.filter(item => item.nodes?.length > 0)
+
+    // Spiral Layout Logic
+    const calculatePosition = (index, total) => {
+        // Simple spiral
+        const angle = index * 0.8
+        const radius = 30 + index * 15
+
+        return [
+            Math.cos(angle) * radius,
+            Math.sin(angle) * radius * 0.6, // Flattened Y
+            -20 - (index * 5)               // Slight depth recession
+        ]
+    }
+
+    if (toShow.length === 0) {
+        return (
+            <Html center>
+                <div className="text-center text-gray-500 pointer-events-none select-none">
+                    <p className="text-lg">No completed star maps found</p>
+                    <p className="text-sm opacity-60">Complete a conversation to add it to the observatory</p>
+                </div>
+            </Html>
+        )
+    }
+
+    return (
+        <group>
+            {toShow.map((item, index) => (
+                <InteractiveConstellation
+                    key={item.projectId}
+                    constellation={item}
+                    offset={calculatePosition(index, toShow.length)}
+                    isHovered={observatoryHoveredConstellation === item.projectId}
+                    isFocused={observatoryFocusedConstellation?.projectId === item.projectId}
+                    onHover={setObservatoryHoveredConstellation}
+                    onClick={setObservatoryFocusedConstellation}
+                />
+            ))}
+        </group>
+    )
+}
+
 // Container for all completed constellation backgrounds
 function CompletedConstellationBackgrounds() {
     const completedImages = useStore(state => state.completedImages)
     const activeProjectId = useStore(state => state.activeProjectId)
     const viewMode = useStore(state => state.viewMode)
 
-    // Hide in chat mode
-    if (viewMode === 'chat') return null
+    // Hide in chat mode AND observatory mode (Observatory has its own view)
+    if (viewMode === 'chat' || viewMode === 'observatory') return null
 
     // Filter: has nodes AND not the current project
     const toShow = completedImages.filter(item =>
@@ -268,20 +320,38 @@ export function Universe({ isInteractive = true }) {
         if (isInteractive) setActiveNode(nodeId)
     }, [isInteractive, setActiveNode])
 
-    // Camera Navigation (Fly to Node)
+    const observatoryFocusedConstellation = useStore(state => state.observatoryFocusedConstellation)
+
+    // ... existing code ...
+
+    // Camera Navigation Logic Update
     useEffect(() => {
-        if (viewMode === 'constellation' && focusTarget && cameraControlsRef.current) {
+        if (!cameraControlsRef.current) return
+
+        if (viewMode === 'observatory') {
+            if (observatoryFocusedConstellation) {
+                // Focus on specific constellation
+                const [x, y, z] = observatoryFocusedConstellation.position
+                cameraControlsRef.current.setLookAt(
+                    x, y, z + 25, // Camera Position
+                    x, y, z,      // Look Target
+                    true
+                )
+            } else {
+                // Overview Mode
+                cameraControlsRef.current.setLookAt(0, 0, 200, 0, 0, 0, true)
+            }
+        } else if (viewMode === 'constellation' && focusTarget) {
             const [x, y, z] = focusTarget.position
-            // Fly to "Eye" position (z+8) and look at "Target" (star center)
             cameraControlsRef.current.setLookAt(
                 x, y, z + 8, // Position
                 x, y, z,     // Target
                 true         // Smooth Transition
             )
         }
-    }, [focusTarget, viewMode])
+    }, [focusTarget, viewMode, observatoryFocusedConstellation])
 
-    // Cinematic Warp Transition
+    // Cinematic Warp Logic Update
     useEffect(() => {
         if (!cameraControlsRef.current) return
 
@@ -291,11 +361,12 @@ export function Universe({ isInteractive = true }) {
         // 2. Camera Movement
         if (viewMode === 'constellation') {
             // Warp INTO the universe (Detailed View)
-            // Move to Overview Position (Forward motion: 120 -> 40)
             cameraControlsRef.current.setLookAt(0, 0, 40, 0, 0, 0, true)
+        } else if (viewMode === 'observatory') {
+            // Warp into observatory (Overview)
+            cameraControlsRef.current.setLookAt(0, 0, 200, 0, 0, 0, true)
         } else {
             // Warp OUT to chat (Deep Space View)
-            // Move far back to create "Approach" feel when returning
             cameraControlsRef.current.setLookAt(0, 0, 120, 0, 0, 0, true)
         }
 
@@ -340,30 +411,6 @@ export function Universe({ isInteractive = true }) {
 
     return (
         <>
-            {/* Edge Legend Overlay - Only visible in constellation view */}
-            {viewMode === 'constellation' && (
-                <div className="absolute bottom-6 left-6 z-10 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg px-4 py-3 shadow-xl">
-                    <div className="text-xs font-medium text-gray-300 mb-2">연결 타입</div>
-                    <div className="space-y-2 text-xs text-gray-400">
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1">
-                                <div className="w-8 h-px bg-gray-500 opacity-40" style={{ backgroundImage: 'linear-gradient(to right, #445566 50%, transparent 50%)', backgroundSize: '4px 1px' }} />
-                            </div>
-                            <span>시간순 연결</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-0.5 bg-cyan-400" style={{ boxShadow: '0 0 4px #00FFFF' }} />
-                            <span>명시적 연결 (≥0.85)</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1">
-                                <div className="w-8 h-px bg-blue-300 opacity-50" style={{ backgroundImage: 'linear-gradient(to right, #88AAFF 50%, transparent 50%)', backgroundSize: '4px 1px' }} />
-                            </div>
-                            <span>암묵적 연결 (≥0.65)</span>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <Canvas
                 camera={{ position: [0, 0, 120], fov: 60 }}
@@ -382,8 +429,13 @@ export function Universe({ isInteractive = true }) {
                     {/* Layer 1: Persistent Background Stars (Always visible with Parallax) */}
                     <Stars radius={300} depth={50} count={visualConfig.starCount} factor={4} saturation={0} fade speed={1} />
 
+
                     {/* Layer 1.5: Completed Constellation Background Images */}
                     <CompletedConstellationBackgrounds />
+
+                    {/* Layer 1.6: Observatory Mode View */}
+                    <ObservatoryView />
+
 
                     {/* Layer 2: Construct/Knowledge Graph (Visible only in Constellation Mode) */}
                     <AnimatedUniverse>
@@ -421,9 +473,9 @@ export function Universe({ isInteractive = true }) {
 
                 <CameraControls
                     ref={cameraControlsRef}
-                    minDistance={2}
-                    maxDistance={30}
-                    dollySpeed={0.5} // Smoother zoom
+                    minDistance={viewMode === 'observatory' && observatoryFocusedConstellation ? 24 : 2}
+                    maxDistance={viewMode === 'observatory' && observatoryFocusedConstellation ? 26 : 300} // Lock zoom when focused
+                    dollySpeed={viewMode === 'observatory' && observatoryFocusedConstellation ? 0 : 0.5} // Disable dolly when focused
                     smoothTime={0.8} // Smooth damping for transitions
                     onChange={handleCameraChange}
                 />

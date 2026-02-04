@@ -12,9 +12,14 @@ export const useStore = create((set, get) => ({
   activeNode: null,    // Currently focused node (for camera comparison etc)
 
   isUniverseExpanded: false,
-  viewMode: 'chat', // 'chat' | 'constellation'
+  viewMode: 'chat', // 'chat' | 'constellation' | 'observatory'
   isLoading: false,
   isWarping: false, // Transition effect state
+
+  // Observatory Mode State
+  observatoryFocusedConstellation: null, // { projectId, position }
+  observatoryHoveredConstellation: null, // projectId
+
   settings: {
     temperature: 0.7,
     maxTokens: 1000,
@@ -26,6 +31,22 @@ export const useStore = create((set, get) => ({
   toggleUniverse: () => set(state => ({ isUniverseExpanded: !state.isUniverseExpanded })),
   setViewMode: (mode) => set({ viewMode: mode }),
   setIsWarping: (isWarping) => set({ isWarping }),
+
+  // Observatory Actions
+  setObservatoryFocusedConstellation: (data) => set({ observatoryFocusedConstellation: data }),
+  setObservatoryHoveredConstellation: (projectId) => set({ observatoryHoveredConstellation: projectId }),
+
+  // Enter constellation from Observatory
+  enterConstellationFromObservatory: async (projectId) => {
+    // 1. Activate the project
+    await get().setActiveProject(projectId);
+    // 2. Switch mode to chat view (as requested)
+    set({
+      viewMode: 'chat',
+      observatoryFocusedConstellation: null,
+      observatoryHoveredConstellation: null
+    });
+  },
 
   // --- Async Actions ---
 
