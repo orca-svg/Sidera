@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Universe } from '../canvas/Universe'
 import { useStore } from '../../store/useStore'
 import { useEventListener } from '../../hooks/useEventListener'
+import { useDebounce } from '../../hooks/useDebounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Menu, Plus, MessageSquare, X, Settings,
@@ -52,8 +53,13 @@ export function MainLayout() {
     // Feature States
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState(null)
+    const [isSearching, setIsSearching] = useState(false)
+    const [selectedSearchIndex, setSelectedSearchIndex] = useState(0)
     const [editingProjectId, setEditingProjectId] = useState(null)
     const [renameValue, setRenameValue] = useState('')
+
+    // Debounced search query (300ms delay)
+    const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
     const chatEndRef = useRef(null)
     const inputRef = useRef(null)
@@ -86,13 +92,75 @@ export function MainLayout() {
         setInputValue('')
     }
 
-    // --- Feature Handlers ---
-    const handleSearch = async (e) => {
-        e.preventDefault()
-        if (!searchQuery.trim()) return
-        const results = await searchNodes(searchQuery)
-        setSearchResults(results)
+    // --- Live Search Effect ---
+    useEffect(() => {
+        const performSearch = async () => {
+            if (!debouncedSearchQuery.trim()) {
+                setSearchResults(null)
+                setSelectedSearchIndex(0)
+                return
+            }
+
+            setIsSearching(true)
+            try {
+                // Search nodes in current project
+                const nodeResults = await searchNodes(debouncedSearchQuery)
+
+                // Search projects by title (local filter)
+                const matchingProjects = projects.filter(p =>
+                    p.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+                )
+
+                setSearchResults({
+                    projects: matchingProjects,
+                    nodes: nodeResults || []
+                })
+                setSelectedSearchIndex(0)
+            } catch (err) {
+                console.error("[Search Error]", err)
+                setSearchResults({ projects: [], nodes: [] })
+            } finally {
+                setIsSearching(false)
+            }
+        }
+
+        performSearch()
+    }, [debouncedSearchQuery, projects, searchNodes])
+
+    // --- Keyboard Navigation for Search ---
+    const handleSearchKeyDown = (e) => {
+        if (!searchResults) return
+
+        const totalResults = (searchResults.projects?.length || 0) + (searchResults.nodes?.length || 0)
+        if (totalResults === 0) return
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setSelectedSearchIndex(prev => (prev + 1) % totalResults)
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setSelectedSearchIndex(prev => (prev - 1 + totalResults) % totalResults)
+        } else if (e.key === 'Enter' && searchResults) {
+            e.preventDefault()
+            const projectCount = searchResults.projects?.length || 0
+            if (selectedSearchIndex < projectCount) {
+                // Selected a project
+                const project = searchResults.projects[selectedSearchIndex]
+                setActiveProject(project.id)
+            } else {
+                // Selected a node
+                const node = searchResults.nodes[selectedSearchIndex - projectCount]
+                if (node) flyToNode(node.id)
+            }
+            setSearchQuery('')
+            setSearchResults(null)
+        } else if (e.key === 'Escape') {
+            setSearchQuery('')
+            setSearchResults(null)
+        }
     }
+
+    // --- Feature Handlers ---
 
     const handleDeleteProject = async (projectId, e) => {
         e.stopPropagation()
@@ -239,18 +307,22 @@ export function MainLayout() {
 
                 {/* View Mode Section: Search & New Chat */}
                 <div className="px-4 pb-4 space-y-3 shrink-0">
-                    {/* Search Input */}
+                    {/* Search Input with Live Search */}
                     <div className="relative group">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                            <Telescope size={16} className="text-gray-500 group-focus-within:text-accent transition-colors" />
+                            {isSearching ? (
+                                <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                            ) : (
+                                <Telescope size={16} className="text-gray-500 group-focus-within:text-accent transition-colors" />
+                            )}
                         </div>
                         <input
                             type="text"
-                            placeholder="Search stars..."
-                            className="w-full bg-black/20 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent/40 focus:bg-black/40 transition-all"
+                            placeholder="Search projects & topics..."
+                            className="w-full bg-black/20 border border-white/10 rounded-lg py-2 pl-9 pr-8 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent/40 focus:bg-black/40 transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
+                            onKeyDown={handleSearchKeyDown}
                         />
                         {searchQuery && (
                             <button
@@ -274,39 +346,93 @@ export function MainLayout() {
                     </button>
                 </div>
 
-                {/* Content Section: History or Search Results */}
+                {/* Content Section: Search Results or History */}
                 <div className="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
                     {searchResults ? (
                         <>
-                            <div className="px-3 mb-2 text-xs font-semibold text-accent uppercase tracking-wider flex items-center justify-between">
-                                <span>Search Results</span>
-                                <span className="text-[10px] bg-accent/10 px-1.5 py-0.5 rounded">{searchResults.length}</span>
-                            </div>
-                            <div className="space-y-1">
-                                {searchResults.length === 0 ? (
-                                    <div className="px-3 py-4 text-center text-sm text-gray-500">
-                                        No stars found.
-                                    </div>
-                                ) : (
-                                    searchResults.map(node => (
-                                        <button
-                                            key={node.id}
-                                            onClick={() => {
-                                                flyToNode(node.id);
-                                                if (window.innerWidth < 768) setIsSidebarOpen(false);
-                                            }}
-                                            className="w-full text-left flex items-start gap-3 px-3 py-3 rounded-lg text-sm hover:bg-white/5 group relative overflow-hidden transition-all"
-                                        >
-                                            <Sparkles size={14} className="mt-0.5 text-accent shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="truncate text-gray-200 group-hover:text-white">{node.question}</div>
-                                                <div className="text-[10px] text-gray-500 truncate">
-                                                    Position: [{node.position[0].toFixed(1)}, {node.position[1].toFixed(1)}]
-                                                </div>
+                            {/* Categorized Search Results */}
+                            {(searchResults.projects?.length === 0 && searchResults.nodes?.length === 0) ? (
+                                <div className="px-3 py-8 text-center">
+                                    <Telescope size={32} className="mx-auto text-gray-600 mb-2" />
+                                    <div className="text-sm text-gray-500">No results found for "{searchQuery}"</div>
+                                    <div className="text-xs text-gray-600 mt-1">Try a different search term</div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Projects Section */}
+                                    {searchResults.projects?.length > 0 && (
+                                        <div className="mb-4">
+                                            <div className="px-3 mb-2 text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                                                <span>🌌 Projects</span>
+                                                <span className="bg-purple-500/20 px-1.5 py-0.5 rounded">{searchResults.projects.length}</span>
                                             </div>
-                                        </button>
-                                    ))
-                                )}
+                                            <div className="space-y-1">
+                                                {searchResults.projects.map((project, idx) => (
+                                                    <button
+                                                        key={project.id}
+                                                        onClick={() => {
+                                                            setActiveProject(project.id);
+                                                            setSearchQuery('');
+                                                            setSearchResults(null);
+                                                        }}
+                                                        className={clsx(
+                                                            "w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                                                            selectedSearchIndex === idx
+                                                                ? "bg-purple-500/20 border border-purple-500/40"
+                                                                : "hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        <MessageSquare size={14} className="text-purple-400 shrink-0" />
+                                                        <span className="truncate text-gray-200">{project.title}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Nodes Section */}
+                                    {searchResults.nodes?.length > 0 && (
+                                        <div>
+                                            <div className="px-3 mb-2 text-[10px] font-semibold text-accent uppercase tracking-wider flex items-center gap-2">
+                                                <span>⭐ Topics</span>
+                                                <span className="bg-accent/20 px-1.5 py-0.5 rounded">{searchResults.nodes.length}</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                {searchResults.nodes.map((node, idx) => {
+                                                    const resultIndex = (searchResults.projects?.length || 0) + idx;
+                                                    return (
+                                                        <button
+                                                            key={node.id}
+                                                            onClick={() => {
+                                                                flyToNode(node.id);
+                                                                setSearchQuery('');
+                                                                setSearchResults(null);
+                                                                if (window.innerWidth < 768) setIsSidebarOpen(false);
+                                                            }}
+                                                            className={clsx(
+                                                                "w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                                                                selectedSearchIndex === resultIndex
+                                                                    ? "bg-accent/20 border border-accent/40"
+                                                                    : "hover:bg-white/5"
+                                                            )}
+                                                        >
+                                                            <Sparkles size={14} className="mt-0.5 text-accent shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="truncate text-gray-200">{node.shortTitle || node.topicSummary || node.question}</div>
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {/* Keyboard hint */}
+                            <div className="px-3 pt-3 mt-2 border-t border-white/5 text-[10px] text-gray-600 flex items-center gap-3">
+                                <span>↑↓ Navigate</span>
+                                <span>↵ Select</span>
+                                <span>Esc Close</span>
                             </div>
                         </>
                     ) : (
